@@ -31,9 +31,9 @@ P4 --------->  |               |  |                +--------------->  |
                                                    +--+
 ```
 
-V1-8 = Graph Vertices
-P1-4 = Partitions
-X1-3 = Missing partitions, ie. graph edge P3 - X3 is a dependency that needs to be satisfied
+- V1-8 = Graph Vertices
+- P1-4 = Partitions
+- X1-3 = Missing partitions, ie. graph edge P3 - X3 is a dependency that needs to be satisfied
 
 ### how-to
 
