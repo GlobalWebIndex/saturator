@@ -1,0 +1,6 @@
+version: '2'
+services:
+
+    saturator:
+        image: gwiq/saturator-example:latest
+        command: --edges=a-b,a-c,a-d,a-e,b-f,c-f,d-g --existing-head-partitions=1,2,3,4 --new-partition-interval=3

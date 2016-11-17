@@ -1,0 +1,24 @@
+### Intellij IDEA ###
+
+## File-based project format
+*.ipr
+*.iws
+
+## Directory-based project format
+.idea/
+/*.iml
+
+## Additional for IntelliJ
+out/
+
+### SBT ###
+
+target/
+lib_managed/
+src_managed/
+project/boot/
+.history
+.cache
+
+**/deploy/bin
+nohup.out
