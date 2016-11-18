@@ -36,8 +36,12 @@ class DagFSM(edges: Set[(DagVertex, DagVertex)], init: () => List[(DagVertex, Li
 
   when(DagUnSaturated) {
     case Event(Saturate(deps), _) =>
-      require(deps.nonEmpty, "There must be some deps to saturate if dag is not saturated !!!")
-      stay() applying SaturationInitializedEvent(deps) andThen(_ => handler ! Saturate(deps) )
+      if (deps.isEmpty) {
+        log.info("No dependencies to saturate ...")
+        goto(DagSaturated)
+      } else {
+        stay() applying SaturationInitializedEvent(deps) andThen(_ => handler ! Saturate(deps) )
+      }
     case Event(SaturationResponse(dep, succeeded), dagState) =>
       val event = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
       val newState = dagState.updated(event)(edges,po,vo)
@@ -76,14 +80,21 @@ class DagFSM(edges: Set[(DagVertex, DagVertex)], init: () => List[(DagVertex, Li
 
   onTransition {
     case DagEmpty -> DagEmpty if nextStateData.getVertexStatesByPartition.isEmpty =>
+      log.info("DAG is empty, initializing  ...")
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
       self ! Initialize(initialData)
-    case x@(DagEmpty | DagSaturated) -> DagUnSaturated =>
+    case DagSaturated -> DagUnSaturated =>
+      log.info("DAG unsaturated, getting dependencies to saturate ...")
+      val p2ps = nextStateData.getPendingToProgressPartitions(edges)
+      self ! Saturate(p2ps)
+    case DagEmpty -> DagUnSaturated =>
+      log.info("DAG initialized, getting dependencies to saturate ...")
       val p2ps = nextStateData.getPendingToProgressPartitions(edges)
       self ! Saturate(p2ps)
     case DagUnSaturated -> DagSaturated =>
       log.info("Dag Saturated ...")
       cmdQueue.headOption.foreach { case (cmd, originalSender) =>
+        log.info("Enqueuing {}", cmd)
         self.tell(cmd, originalSender)
         cmdQueue = cmdQueue.tail
       }
