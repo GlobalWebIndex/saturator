@@ -1,13 +1,12 @@
 package gwi.saturator
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import gwi.saturator.DagFSM.{CreatePartition, Saturate, SaturationResponse}
 import org.backuity.clist._
 import org.backuity.clist.util.Read
-
-import scala.concurrent.duration._
 import DagMock._
+import scala.concurrent.duration._
 
 object Launcher extends CliMain[Unit] {
 
@@ -23,20 +22,7 @@ object Launcher extends CliMain[Unit] {
   var newPartitionInterval = arg[Int](name = "new-partition-interval")
 
   override def run: Unit = {
-    val system = ActorSystem(
-      "example",
-      ConfigFactory.parseString(
-        """
-          |akka {
-          |  log-dead-letters-during-shutdown = off
-          |  actor.warn-about-java-serializer-usage = off
-          |  persistence {
-          |    journal.plugin = "inmemory-journal"
-          |    snapshot-store.plugin = "inmemory-snapshot-store"
-          |  }
-          |}
-        """.stripMargin)
-    )
+    val system = ActorSystem("example", ConfigFactory.parseString(DagFSMSpec.config).withValue("redis.host", ConfigValueFactory.fromAnyRef("redis")))
 
     val vertices = edges.flatMap(t => Set(t._1, t._2)).toSet
     val headVertex = edges.head._1

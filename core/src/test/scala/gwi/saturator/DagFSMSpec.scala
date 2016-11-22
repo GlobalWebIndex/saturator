@@ -11,30 +11,39 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.implicitConversions
 
-class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with Matchers with FreeSpecLike with BeforeAndAfterAll with ImplicitSender {
+object DagFSMSpec {
+  val config =
+        """
+        akka {
+          log-dead-letters-during-shutdown = off
+          actor.warn-about-java-serializer-usage = off
+          akka-persistence-redis.journal.class = "com.hootsuite.akka.persistence.redis.journal.RedisJournal"
+          persistence.journal.plugin = "akka-persistence-redis.journal"
+        }
+        redis {
+          host = localhost
+          port = 6379
+          password = foo
+          sentinel = false
+        }
+        """.stripMargin
+}
+
+class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with ImplicitSender {
   import DagMock._
   val workTimeout = 10.seconds
 
-  def this() = this(
-    ActorSystem(
-      "PersistentFSMSpec",
-      ConfigFactory.parseString(
-        """
-        |akka {
-        |  log-dead-letters-during-shutdown = off
-        |  actor.warn-about-java-serializer-usage = off
-        |  persistence {
-        |    journal.plugin = "inmemory-journal"
-        |    snapshot-store.plugin = "inmemory-snapshot-store"
-        |  }
-        |}
-        """.stripMargin)
-    )
-  )
+  def this() = this(ActorSystem("PersistentFSMSpec", ConfigFactory.parseString(DagFSMSpec.config)))
 
-  override def afterAll(): Unit = {
-    Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf)
+  override def beforeAll(): Unit = try super.beforeAll() finally {
+    startContainer("redis", "redis-test", 6379)(())
   }
+
+  override def afterAll(): Unit = try {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    stopContainer("redis-test")(())
+    Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf)
+  } finally super.afterAll()
 
   "testing one partition saturation thoroughly" in {
 

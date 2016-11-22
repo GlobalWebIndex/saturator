@@ -18,14 +18,12 @@ object Build extends sbt.Build {
 
   lazy val libraryDeps = Seq(
     "com.lihaoyi"                 %%  "pprint"                                % "0.4.1",
-    "org.iq80.leveldb"            %   "leveldb"                               % "0.9",
-    "org.fusesource.leveldbjni"   %   "leveldbjni-all"                        % "1.8",
     "com.typesafe.scala-logging"  %%  "scala-logging"                         % "3.4.0",
+    "com.hootsuite"               %%  "akka-persistence-redis"                % "0.6.0",
+    "com.typesafe.akka"           %%  "akka-remote"                           % akkaVersion,
     "com.typesafe.akka"           %%  "akka-cluster"                          % akkaVersion,
     "com.typesafe.akka"           %%  "akka-cluster-tools"                    % akkaVersion,
     "com.typesafe.akka"           %%  "akka-persistence"                      % akkaVersion,
-    "com.typesafe.akka"           %%  "akka-persistence-query-experimental"   % akkaVersion,
-    "com.github.dnvriend"         %%  "akka-persistence-inmemory"             % "1.3.10"      % "test",
     "com.typesafe.akka"           %%  "akka-testkit"                          % akkaVersion   % "test",
     "org.scalatest"               %%  "scalatest"                             % "3.0.0"       % "test",
     "com.lihaoyi"                 %   "ammonite-repl"                         % "0.7.7"       % "test" cross CrossVersion.full
@@ -33,7 +31,7 @@ object Build extends sbt.Build {
 
   lazy val sharedSettings = Seq(
     organization := "net.globalwebindex",
-    version := "0.01-SNAPSHOT",
+    version := "0.02-SNAPSHOT",
     scalaVersion := "2.11.8",
     offline := true,
     assembleArtifact := false,
@@ -46,10 +44,6 @@ object Build extends sbt.Build {
     libraryDependencies ++= libraryDeps,
     autoCompilerPlugins := true,
     cancelable in Global := true,
-    assemblyMergeStrategy in assembly := {
-      case PathList("org", "iq80", "leveldb", xs @ _*) => MergeStrategy.first
-      case x => (assemblyMergeStrategy in assembly).value(x)
-    },
     resolvers ++= Seq(
       Resolver.sonatypeRepo("snapshots"),
       Resolver.typesafeRepo("releases"),

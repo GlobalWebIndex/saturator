@@ -38,10 +38,11 @@ P4 --------->  |               |  |                +--------------->  |
 ### how-to
 
 ```
-"net.globalwebindex" %% "saturator" % "0.01-SNAPSHOT"
+"net.globalwebindex" %% "saturator" % "0.02-SNAPSHOT"
 ```
 
-See demo at `example/` :
+See demo at `example/`. Akka persistence uses redis plugin as it is the best fit for saturator unless DAG gets really complex or
+it has a lot of partitions in which case something like Cassandra would be a better fit.
 
 ```
 $ cd docker
