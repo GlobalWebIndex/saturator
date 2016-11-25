@@ -12,11 +12,12 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.implicitConversions
 
 object DagFSMSpec {
-  val config =
+  val config = ConfigFactory.parseString(
         """
         akka {
           log-dead-letters-during-shutdown = off
           actor.warn-about-java-serializer-usage = off
+          extensions = ["com.romix.akka.serialization.kryo.KryoSerializationExtension$"]
           akka-persistence-redis.journal.class = "com.hootsuite.akka.persistence.redis.journal.RedisJournal"
           persistence.journal.plugin = "akka-persistence-redis.journal"
         }
@@ -27,13 +28,14 @@ object DagFSMSpec {
           sentinel = false
         }
         """.stripMargin
+  ).withFallback(ConfigFactory.load("serialization"))
 }
 
 class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with ImplicitSender {
   import DagMock._
   val workTimeout = 10.seconds
 
-  def this() = this(ActorSystem("PersistentFSMSpec", ConfigFactory.parseString(DagFSMSpec.config)))
+  def this() = this(ActorSystem("PersistentFSMSpec", DagFSMSpec.config))
 
   override def beforeAll(): Unit = try super.beforeAll() finally {
     startContainer("redis", "redis-test", 6379)(())

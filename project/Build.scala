@@ -8,6 +8,8 @@ import sbtdocker.mutable.Dockerfile
 
 object Build extends sbt.Build {
 
+  lazy val appVersion = "0.04-SNAPSHOT"
+
   lazy val akkaVersion = "2.4.11"
 
   lazy val testSettings = Seq(
@@ -20,6 +22,7 @@ object Build extends sbt.Build {
     "com.lihaoyi"                 %%  "pprint"                                % "0.4.1",
     "com.typesafe.scala-logging"  %%  "scala-logging"                         % "3.4.0",
     "com.hootsuite"               %%  "akka-persistence-redis"                % "0.6.0",
+    "com.github.romix.akka"       %%  "akka-kryo-serialization"               % "0.5.0",
     "com.typesafe.akka"           %%  "akka-remote"                           % akkaVersion,
     "com.typesafe.akka"           %%  "akka-cluster"                          % akkaVersion,
     "com.typesafe.akka"           %%  "akka-cluster-tools"                    % akkaVersion,
@@ -31,7 +34,7 @@ object Build extends sbt.Build {
 
   lazy val sharedSettings = Seq(
     organization := "net.globalwebindex",
-    version := "0.02-SNAPSHOT",
+    version := appVersion,
     scalaVersion := "2.11.8",
     offline := true,
     assembleArtifact := false,

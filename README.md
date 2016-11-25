@@ -38,11 +38,12 @@ P4 --------->  |               |  |                +--------------->  |
 ### how-to
 
 ```
-"net.globalwebindex" %% "saturator" % "0.02-SNAPSHOT"
+"net.globalwebindex" %% "saturator" % "0.04-SNAPSHOT"
 ```
 
 See demo at `example/`. Akka persistence uses redis plugin as it is the best fit for saturator unless DAG gets really complex or
 it has a lot of partitions in which case something like Cassandra would be a better fit.
+It uses Kryo serialization because event log is persisted only temporarily and it would be deleted on new deploy.
 
 ```
 $ cd docker
