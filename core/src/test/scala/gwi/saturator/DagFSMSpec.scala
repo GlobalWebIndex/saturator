@@ -28,7 +28,7 @@ object DagFSMSpec {
           sentinel = false
         }
         """.stripMargin
-  ).withFallback(ConfigFactory.load("serialization"))
+  ).withFallback(ConfigFactory.load())
 }
 
 class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with ImplicitSender {
