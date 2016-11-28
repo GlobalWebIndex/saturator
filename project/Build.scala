@@ -8,7 +8,7 @@ import sbtdocker.mutable.Dockerfile
 
 object Build extends sbt.Build {
 
-  lazy val appVersion = "0.04-SNAPSHOT"
+  lazy val appVersion = "0.05-SNAPSHOT"
 
   lazy val akkaVersion = "2.4.11"
 

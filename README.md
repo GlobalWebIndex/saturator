@@ -38,7 +38,7 @@ P4 --------->  |               |  |                +--------------->  |
 ### how-to
 
 ```
-"net.globalwebindex" %% "saturator" % "0.04-SNAPSHOT"
+"net.globalwebindex" %% "saturator" % "0.05-SNAPSHOT"
 ```
 
 See demo at `example/`. Akka persistence uses redis plugin as it is the best fit for saturator unless DAG gets really complex or
