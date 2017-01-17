@@ -8,7 +8,7 @@ import sbtdocker.mutable.Dockerfile
 
 object Build extends sbt.Build {
 
-  lazy val appVersion = "0.05-SNAPSHOT"
+  lazy val appVersion = "0.06-SNAPSHOT"
 
   lazy val akkaVersion = "2.4.14"
 
@@ -59,7 +59,7 @@ object Build extends sbt.Build {
     publishMavenStyle := true,
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
-    publishTo := Some("S3 Snapshots" at "s3://maven.globalwebindex.net.s3-website-eu-west-1.amazonaws.com/snapshots"),
+    publishTo := Some("S3 Snapshots" at "s3://public.maven.globalwebindex.net.s3-website-eu-west-1.amazonaws.com/snapshots"),
     pomExtra :=
       <url>https://github.com/GlobalWebIndex/saturator</url>
         <licenses>

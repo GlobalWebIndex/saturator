@@ -1,0 +1,26 @@
+sudo: required
+os:
+  - linux
+services:
+  - docker
+language: scala
+scala:
+    - 2.11.8
+jdk:
+    - oraclejdk8
+cache:
+  directories:
+    - $HOME/.m2/repository
+    - $HOME/.sbt
+    - $HOME/.ivy2
+branches:
+  only:
+    - master
+notifications:
+  email:
+    recipients:
+      - liska.jakub@gmail.com
+before_install:
+- docker pull redis
+script:
+- sbt ++$TRAVIS_SCALA_VERSION clean test

@@ -1,5 +1,7 @@
 ## saturator
 
+[![Build Status](https://travis-ci.org/GlobalWebIndex/saturator.svg?branch=master)](https://travis-ci.org/GlobalWebIndex/saturator)
+
 Finite State Machine that is satisfying dependencies within partitioned/layered directed acyclic graph until it is fully saturated
 
 ```
@@ -38,7 +40,7 @@ P4 --------->  |               |  |                +--------------->  |
 ### how-to
 
 ```
-"net.globalwebindex" %% "saturator" % "0.05-SNAPSHOT"
+"net.globalwebindex" %% "saturator" % "0.06-SNAPSHOT"
 ```
 
 See demo at `example/`. Akka persistence uses redis plugin as it is the best fit for saturator unless DAG gets really complex or
