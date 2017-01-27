@@ -1,4 +1,2 @@
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.3")
-addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.6.1")
-addSbtPlugin("se.marcuslonnberg" % "sbt-docker" % "1.4.0")
-addSbtPlugin("com.frugalmechanic" % "fm-sbt-s3-resolver" % "0.9.0")
+// for development, use file://
+dependsOn(ProjectRef(uri("ssh://git@github.com/l15k4/sbt-common.git"), "sbt-common"))
