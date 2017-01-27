@@ -2,7 +2,6 @@ import gwi.sbt.CommonPlugin
 import gwi.sbt.CommonPlugin.autoImport._
 
 organization in ThisBuild := "net.globalwebindex"
-version in ThisBuild  := "0.06-SNAPSHOT"
 fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi ++ akkaDeps ++ testingDeps ++ Seq(pprint)
 
