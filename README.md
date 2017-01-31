@@ -44,7 +44,7 @@ libraryDependencies += "net.globalwebindex" %% "saturator" % "x.y.x"
 ```
 or
 ```
-dependsOn(ProjectRef(uri("https://github.com/GlobalWebIndex/saturator.git#vx.y.x"), "core"))
+dependsOn(ProjectRef(uri("https://github.com/GlobalWebIndex/saturator.git#vx.y.x"), "saturator-core"))
 ```
 
 See demo at `example/`. Akka persistence uses redis plugin as it is the best fit for saturator unless DAG gets really complex or
