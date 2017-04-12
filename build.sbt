@@ -1,6 +1,7 @@
 import gwi.sbt.CommonPlugin
 import gwi.sbt.CommonPlugin.autoImport._
 
+crossScalaVersions in ThisBuild := Seq("2.12.1", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi ++ akkaDeps ++ testingDeps ++ Seq(pprint)
