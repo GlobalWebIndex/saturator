@@ -3,7 +3,7 @@ version in ThisBuild := "0.0.2"
 crossScalaVersions in ThisBuild := Seq("2.12.1", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
-libraryDependencies in ThisBuild ++= loggingApi ++ akkaDeps ++ testingDeps ++ Seq(pprint)
+libraryDependencies in ThisBuild ++= loggingApi ++ Seq(akkaActor, akkaTestkit, akkaPersistence, akkaPersistenceRedis, akkaKryoSerialization, scalatest, pprint)
 
 lazy val saturator = (project in file("."))
   .aggregate(`saturator-core`, `saturator-example`)
