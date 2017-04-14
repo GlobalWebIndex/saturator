@@ -5,7 +5,7 @@ services:
   - docker
 language: scala
 scala:
-    - 2.11.8
+    - 2.12.1
 jdk:
     - oraclejdk8
 cache:
@@ -21,6 +21,8 @@ notifications:
     recipients:
       - liska.jakub@gmail.com
 before_install:
-- docker pull redis
+    - docker pull redis
+before_script:
+    - rm -rf ${HOME}/.sbt/0.13/staging
 script:
-- sbt ++$TRAVIS_SCALA_VERSION clean test
+    - sbt ++$TRAVIS_SCALA_VERSION clean test
