@@ -27,6 +27,11 @@ case class DagState private(
   import DagState._
   import DagVertex.State._
 
+  private def alienPartitionsError(vertexPartitions: Map[DagVertex, Set[DagPartition]], rootVertexPartitions: Set[DagPartition]) = {
+    s"Graph contains alien partitions:\n${pprint.tokenize(vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map( t => t._1 -> t._2.diff(rootVertexPartitions)).get).mkString("\n","\n","\n")}" +
+    s"Root partitions : ${rootVertexPartitions.mkString("\n","\n","\n")} vertex partitions : ${vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map(_._2).mkString("\n","\n","\n")}"
+  }
+
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
   def getFailedDependencies: Set[FailedDependency] = failedDependencies
   def getVertexStatesFor(p: DagPartition) = vertexStatesByPartition(p)
@@ -50,7 +55,7 @@ case class DagState private(
       val vertexPartitions = partitionsByVertex.filterKeys(_ != rootVertex)
       require(
         vertexPartitions.forall(_._2.diff(rootVertexPartitions).isEmpty),
-        s"Graph contains alien partitions:\n${pprint.tokenize(vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map( t => t._1 -> t._2.diff(rootVertexPartitions)).get).mkString}"
+        alienPartitionsError(vertexPartitions, rootVertexPartitions)
       )
       def buildGraphForPartition(p: DagPartition, vertex: DagVertex): Map[DagVertex, String] = {
         def isComplete = (Dag.ancestorsOf(vertex, edges) + vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
