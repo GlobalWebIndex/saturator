@@ -28,7 +28,8 @@ case class DagState private(
   import DagVertex.State._
 
   private def alienPartitionsError(vertexPartitions: Map[DagVertex, Set[DagPartition]], rootVertexPartitions: Set[DagPartition]) = {
-    s"Graph contains alien partitions:\n${pprint.tokenize(vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map( t => t._1 -> t._2.diff(rootVertexPartitions)).get).mkString("\n","\n","\n")}" +
+    val (vertex, partitions) = vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map( t => t._1 -> t._2.diff(rootVertexPartitions)).get
+    s"Graph contains $vertex with alien partitions:\n${partitions.mkString("\n","\n","\n")}" +
     s"Root partitions : ${rootVertexPartitions.mkString("\n","\n","\n")}Vertex partitions : ${vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map(_._2.mkString("\n","\n","\n"))}"
   }
 
@@ -36,7 +37,7 @@ case class DagState private(
   def getFailedDependencies: Set[FailedDependency] = failedDependencies
   def getVertexStatesFor(p: DagPartition) = vertexStatesByPartition(p)
   def isSaturated = vertexStatesByPartition.values.forall(_.values.forall(_ == Complete))
-  override def toString = pprint.tokenize(vertexStatesByPartition).mkString
+  override def toString = vertexStatesByPartition.map { case (p, vertexStates) => s"$p -> ${vertexStates.mkString("\n","\n","\n")}" }.mkString("\n","\n","\n")
 
   def getPendingToProgressPartitions(edges: Set[(DagVertex, DagVertex)])(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] =
     TreeSet(
@@ -73,7 +74,7 @@ case class DagState private(
           acc.adjust(p) { partitionStateByVertex =>
               require(
                 partitionStateByVertex(targetVertex) == Pending && sourceVertices.forall(partitionStateByVertex(_) == Complete),
-                s"Illegal dag state of Pending2Progress $d\n: ${pprint.tokenize(acc(p)).mkString}"
+                s"Illegal dag state of Pending2Progress $d\n: ${acc(p).mkString("\n","\n","\n")}"
               )
               partitionStateByVertex.updated(targetVertex, InProgress)
             }

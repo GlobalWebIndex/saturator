@@ -105,11 +105,11 @@ class DagFSM(edges: Set[(DagVertex, DagVertex)], init: () => List[(DagVertex, Li
       cmdQueue.foreach { case (cmd, originalSender) => originalSender ! Cmd.Rejected(cmd, status, dagState, getLog) }
       reason match {
         case PersistentFSM.Failure(ex) =>
-          log.error(s"Failure due to $ex\n at status {} with state \n{}\n with events:\n{}", status, dagState, pprint.tokenize(getLog).mkString)
+          log.error(s"Failure due to $ex\n at status {} with state \n{}\n with events:\n{}", status, dagState, getLog.mkString("\n","\n","\n"))
         case PersistentFSM.Shutdown =>
-          log.warning("Outside termination at status {} with state \n{}\n with events:\n{}", status, dagState, pprint.tokenize(getLog.map(_.stateName)).mkString)
+          log.warning("Outside termination at status {} with state \n{}\n with events:\n{}", status, dagState, getLog.map(_.stateName).mkString("\n","\n","\n"))
         case PersistentFSM.Normal =>
-          log.info("Stopping at status {} with state \n{}\n with events:\n{}", status, status, pprint.tokenize(getLog.map(_.stateName)).mkString)
+          log.info("Stopping at status {} with state \n{}\n with events:\n{}", status, status, getLog.map(_.stateName).mkString("\n","\n","\n"))
       }
   }
 
