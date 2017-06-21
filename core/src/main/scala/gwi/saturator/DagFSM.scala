@@ -142,7 +142,7 @@ object DagFSM {
 
   def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, name: String = "dag-fsm")
            (implicit arf: ActorRefFactory, edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): ActorRef = {
-    arf.actorOf(Props(classOf[DagFSM], init _, handler, po, vo), name)
+    arf.actorOf(Props(classOf[DagFSM], init _, handler, edges, po, vo), name)
   }
 }
 

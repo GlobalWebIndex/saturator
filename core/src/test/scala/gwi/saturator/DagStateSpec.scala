@@ -22,13 +22,15 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
     )
 
   "loading DAG" - {
-    "should fail in case of alien partition presence" in {
+    "should ignore alien partitions" in {
       val partitionsByVertex = Map[Int, Set[Long]](
         1 -> Set(1L, 2L),
         2 -> Set(1L, 2L),
         3 -> Set(1L, 2L, 3L)
       )
-      intercept[IllegalArgumentException](DagState.empty.updated(StateInitializedEvent(partitionsByVertex)))
+      val stateByVertex: Map[DagVertex, String] = (1 to 3).map(_ -> Complete).toMap ++ (4 to 7).map(_ -> Pending).toMap
+      val expectedState: Map[DagPartition, Map[DagVertex, String]] = (1 to 2).map( _ -> stateByVertex).toMap
+      assertResult(expectedState)(DagState.empty.updated(StateInitializedEvent(partitionsByVertex)).getVertexStatesByPartition)
     }
 
     "should load complete DAG" in {

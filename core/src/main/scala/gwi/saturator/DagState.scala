@@ -1,5 +1,7 @@
 package gwi.saturator
 
+import com.typesafe.scalalogging.LazyLogging
+
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.math.Ordering
 
@@ -19,7 +21,7 @@ object DagState {
   case class PartitionVertexRemovedEvent(p: DagPartition, vertex: DagVertex) extends DagStateEvent
 }
 
-case class DagState private(private val vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]]) {
+case class DagState private(private val vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]]) extends LazyLogging {
   import Dag._
   import DagState._
   import DagVertex.State._
@@ -62,10 +64,9 @@ case class DagState private(private val vertexStatesByPartition: TreeMap[DagPart
       val rootVertex = Dag.root(edges)
       val rootVertexPartitions = partitionsByVertex(rootVertex)
       val vertexPartitions = partitionsByVertex.filterKeys(_ != rootVertex)
-      require(
-        vertexPartitions.forall(_._2.diff(rootVertexPartitions).isEmpty),
-        alienPartitionsError(vertexPartitions, rootVertexPartitions) //TODO alien partitions could be removed from DagState, there would be eventually reindexed
-      )
+      if(!vertexPartitions.forall(_._2.diff(rootVertexPartitions).isEmpty))
+        logger.warn(alienPartitionsError(vertexPartitions, rootVertexPartitions))
+
       def buildGraphForPartition(p: DagPartition, vertex: DagVertex): Map[DagVertex, String] = {
         def isComplete = (Dag.ancestorsOf(vertex, edges) + vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
         val state = if (vertex == rootVertex || isComplete) Complete else Pending
