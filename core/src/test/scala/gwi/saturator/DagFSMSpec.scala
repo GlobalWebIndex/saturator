@@ -93,7 +93,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     }
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(edges, init, probe.ref)
+    val fsmActor = DagFSM(init, probe.ref)
 
     // initial saturation
 
@@ -137,7 +137,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     // persistent state replaying
     Thread.sleep(300)
-    val newFsmActor = DagFSM(edges, init, probe.ref)
+    val newFsmActor = DagFSM(init, probe.ref)
 
     newFsmActor ! ShutDown
     expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
@@ -172,7 +172,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
       )
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(edges, init, probe.ref, "dag-fsm-2")
+    val fsmActor = DagFSM(init, probe.ref, "dag-fsm-2")
 
     probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
     probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }

@@ -37,7 +37,8 @@ object Launcher extends CliMain[Unit] {
 class Example(edges: Set[(DagVertex,DagVertex)], init: => List[(DagVertex, List[DagPartition])], interval: FiniteDuration, lastPartition: Int) extends Actor with ActorLogging {
   import context.dispatcher
   var partitionCounter = lastPartition + 1
-  val dagFSM = DagFSM(edges, init, self)
+  implicit val e = edges
+  val dagFSM = DagFSM(init, self)
 
   val c = context.system.scheduler.schedule(interval, interval) {
     dagFSM ! CreatePartition(PartitionMock(partitionCounter.toString))

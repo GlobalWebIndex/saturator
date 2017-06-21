@@ -16,7 +16,7 @@ object Status {
   val DagUnSaturated = "DagUnSaturated"
 }
 
-class DagFSM(edges: Set[(DagVertex, DagVertex)], init: () => List[(DagVertex, List[DagPartition])], handler: ActorRef)(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex])
+class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRef)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex])
   extends PersistentFSM[Status, DagState, DagStateEvent] with LoggingPersistentFSM[Status, DagState, DagStateEvent] with ActorLogging {
   import DagFSM._
   import DagState._
@@ -140,9 +140,9 @@ object DagFSM {
 
   case class AlreadyShutdownException(msg: String) extends Exception(msg)
 
-  def apply(edges: Set[(DagVertex, DagVertex)], init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, name: String = "dag-fsm")
-           (implicit arf: ActorRefFactory, po: Ordering[DagPartition], vo: Ordering[DagVertex]): ActorRef = {
-    arf.actorOf(Props(classOf[DagFSM], edges, init _, handler, po, vo), name)
+  def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, name: String = "dag-fsm")
+           (implicit arf: ActorRefFactory, edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): ActorRef = {
+    arf.actorOf(Props(classOf[DagFSM], init _, handler, po, vo), name)
   }
 }
 
