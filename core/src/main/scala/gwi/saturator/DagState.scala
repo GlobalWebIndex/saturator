@@ -8,7 +8,7 @@ object DagState {
     def adjust(k: A)(f: B => B) = underlying.updated(k, f(underlying(k)))
   }
 
-  def empty(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = DagState(vertexStatesByPartition = TreeMap.empty[DagPartition, TreeMap[DagVertex, String]], failedDependencies = Set.empty)
+  def empty(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = DagState(vertexStatesByPartition = TreeMap.empty[DagPartition, TreeMap[DagVertex, String]])
 
   trait DagStateEvent
   case class StateInitializedEvent(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends DagStateEvent
@@ -19,10 +19,7 @@ object DagState {
   case class PartitionVertexRemovedEvent(p: DagPartition, vertex: DagVertex) extends DagStateEvent
 }
 
-case class DagState private(
-                             private val vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]],
-                             private val failedDependencies: Set[FailedDependency]
-              ) {
+case class DagState private(private val vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]]) {
   import Dag._
   import DagState._
   import DagVertex.State._
@@ -34,9 +31,11 @@ case class DagState private(
   }
 
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
-  def getFailedDependencies: Set[FailedDependency] = failedDependencies
   def getVertexStatesFor(p: DagPartition) = vertexStatesByPartition(p)
-  def isSaturated = vertexStatesByPartition.values.forall(_.values.forall(_ == Complete))
+  def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]) = vertexStatesByPartition.values.forall { vertexStates =>
+    vertexStates(root(edges)) == Complete && descendantsOfRoot[DagVertex](edges, v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
+  }
+
   override def toString = vertexStatesByPartition.map { case (p, vertexStates) => s"$p -> ${vertexStates.mkString("\n","\n","\n")}" }.mkString("\n","\n","\n")
 
   def getPendingToProgressPartitions(edges: Set[(DagVertex, DagVertex)])(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] =
@@ -49,6 +48,15 @@ case class DagState private(
       }.toSeq:_*
     )
 
+  private def saturationSanityCheck(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex)(implicit edges: Set[(DagVertex, DagVertex)]) = {
+    val neighborDescendants = neighborDescendantsOf(targetVertex, edges)
+    val partitionStateByVertex = vertexStatesByPartition(p)
+    require(
+      sourceVertices.forall(partitionStateByVertex(_) == Complete) && partitionStateByVertex(targetVertex) == InProgress && partitionStateByVertex.filterKeys(neighborDescendants.contains).forall(_._2 == Pending),
+      s"Illegal inProgressToComplete state of $p from $sourceVertices to $targetVertex : ${partitionStateByVertex.mkString("\n", "\n", "\n")}"
+    )
+  }
+
   def updated(event: DagStateEvent)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = event match {
     case StateInitializedEvent(partitionsByVertex) =>
       val rootVertex = Dag.root(edges)
@@ -56,17 +64,14 @@ case class DagState private(
       val vertexPartitions = partitionsByVertex.filterKeys(_ != rootVertex)
       require(
         vertexPartitions.forall(_._2.diff(rootVertexPartitions).isEmpty),
-        alienPartitionsError(vertexPartitions, rootVertexPartitions)
+        alienPartitionsError(vertexPartitions, rootVertexPartitions) //TODO alien partitions could be removed from DagState, there would be eventually reindexed
       )
       def buildGraphForPartition(p: DagPartition, vertex: DagVertex): Map[DagVertex, String] = {
         def isComplete = (Dag.ancestorsOf(vertex, edges) + vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
         val state = if (vertex == rootVertex || isComplete) Complete else Pending
         Dag.neighborDescendantsOf(vertex, edges).flatMap(buildGraphForPartition(p, _)).toMap + (vertex -> state)
       }
-      DagState(
-        TreeMap(rootVertexPartitions.map(p => p -> buildGraphForPartition(p, rootVertex)).toSeq:_*),
-        Set.empty
-      )
+      DagState(TreeMap(rootVertexPartitions.map(p => p -> buildGraphForPartition(p, rootVertex)).toSeq:_*))
 
     case SaturationInitializedEvent(deps) =>
       def newStates =
@@ -82,17 +87,12 @@ case class DagState private(
       copy(vertexStatesByPartition = newStates)
 
     case SaturationSucceededEvent(Dependency(p, sourceVertices, targetVertex)) =>
-      val neighborDescendants = neighborDescendantsOf(targetVertex, edges)
-      val partitionStateByVertex = vertexStatesByPartition(p)
-      require(
-        sourceVertices.forall(partitionStateByVertex(_) == Complete) && partitionStateByVertex(targetVertex) == InProgress && partitionStateByVertex.filterKeys(neighborDescendants.contains).forall(_._2 == Pending),
-        s"Illegal inProgressToComplete state of $p from $sourceVertices to $targetVertex : ${partitionStateByVertex.mkString("\n","\n","\n")}"
-      )
+      saturationSanityCheck(p, sourceVertices, targetVertex)
       copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Complete)))
 
-    case SaturationFailedEvent(Dependency(p, sourceVertices, targetV)) =>
-      require(vertexStatesByPartition(p)(targetV) == InProgress, s"Illegal inProgressToFailed state of $p : ${vertexStatesByPartition(p).mkString("\n","\n","\n")}")
-      copy(vertexStatesByPartition = vertexStatesByPartition - p, failedDependencies = failedDependencies + FailedDependency(p, sourceVertices, targetV))
+    case SaturationFailedEvent(Dependency(p, sourceVertices, targetVertex)) =>
+      saturationSanityCheck(p, sourceVertices, targetVertex)
+      copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Failed)))
 
     case PartitionCreatedEvent(p) =>
       val rootVertex = Dag.root(edges)

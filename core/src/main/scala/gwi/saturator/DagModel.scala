@@ -15,9 +15,9 @@ object DagVertex {
     val Pending = "Pending"
     val Complete = "Complete"
     val InProgress = "InProgress"
+    val Failed = "Failed"
   }
 }
-case class FailedDependency(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex)
 case class Dependency(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex)
 
 object Dependency {

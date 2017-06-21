@@ -24,6 +24,11 @@ class DagSpec extends FreeSpec with ScalaFutures with Matchers with BeforeAndAft
   "descendantsOf" in {
     assertResult((2 to 7).toSet)(descendantsOf(1, edges))
     assertResult(Set.empty)(descendantsOf(5, edges))
+    assertResult((2 to 7).toSet)(descendantsOf[Int](1, edges, _ => true))
+    assertResult(Set.empty)(descendantsOf[Int](5, edges, _ => true))
+    assertResult(Set.empty)(descendantsOf[Int](1, edges, x => x < 2))
+    assertResult(Set.empty)(descendantsOf[Int](1, edges, _ => false))
+    assertResult(Set(2,4,5,7))(descendantsOf[Int](1, edges, x => x != 3))
   }
 
   "descendantsOfRoot" in

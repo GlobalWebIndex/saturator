@@ -9,14 +9,14 @@ object Dag {
 
   def allVertices[V](edges: Set[(V,V)]): Set[V] = edges.flatMap(edge => Set(edge._1, edge._2))
 
-  def descendantsOf[V](v: V, edges: Set[(V,V)]): Set[V] = {
+  def descendantsOf[V](v: V, edges: Set[(V,V)], condition: V => Boolean = (_: V) => true): Set[V] = {
     val (outgoingEdges, remainingEdges) = edges.partition(_._1 == v)
-    val neighborDescendants = outgoingEdges.map(_._2)
-    neighborDescendants ++ neighborDescendants.flatMap(descendantsOf(_, remainingEdges))
+    val neighborDescendants = outgoingEdges.map(_._2).filter(t => condition(t) && ancestorsOf(t, edges).forall(condition))
+    neighborDescendants ++ neighborDescendants.flatMap(descendantsOf(_, remainingEdges, condition))
   }
 
-  def descendantsOfRoot[V](edges: Set[(V,V)]): Set[V] =
-    descendantsOf(root(edges), edges)
+  def descendantsOfRoot[V](edges: Set[(V,V)], condition: V => Boolean = (_: V) => true): Set[V] =
+    descendantsOf(root(edges), edges, condition)
 
   def neighborDescendantsOf[V](v: V, edges: Set[(V,V)]): Set[V] =
     edges.collect { case (source,target) if source == v => target }
