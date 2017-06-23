@@ -52,6 +52,18 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
         stay().applying(event, SaturationInitializedEvent(newDeps)) andThen (_ => handler ! Saturate(newDeps) )
       else
         stay() applying event
+    case Event(ShutDown, _) =>
+      log.info("Shutdown command received, waiting for state to become saturated ...")
+      cmdQueue :+= (ShutDown -> sender())
+      stay()
+    case Event(c@(_:CreatePartition | _:RemovePartitionVertex), _) =>
+      if (cmdQueue.lastOption.exists(_._1 == ShutDown)) {
+        sender() ! Failure(AlreadyShutdownException("Shutdown was scheduled, please try later !!!"))
+      } else {
+        log.warning(s"Unhandled command $c, waiting for state to become saturated ...")
+        cmdQueue :+= (c.asInstanceOf[Cmd] -> sender())
+      }
+      stay()
   }
 
   when(DagSaturated) {
@@ -64,17 +76,8 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
   }
 
   whenUnhandled {
-    case Event(ShutDown, dagState) =>
-      cmdQueue :+= (ShutDown -> sender())
-      stay()
-    case Event(c@(_:CreatePartition | _:RemovePartitionVertex), _) =>
-      if (cmdQueue.lastOption.exists(_._1 == ShutDown))
-        sender() ! Failure(AlreadyShutdownException("Shutdown was scheduled, please try later !!!"))
-      else
-        cmdQueue :+= (c.asInstanceOf[Cmd] -> sender())
-      stay()
     case Event(unknown, dagState) =>
-      log.warning(s"Unhandled command $unknown at status $stateName with state:\n $dagState")
+      log.error(s"Unhandled command $unknown at status $stateName with state:\n $dagState")
       stay()
   }
 
@@ -88,7 +91,7 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
       val p2ps = nextStateData.getPendingToProgressPartitions(edges)
       self ! Saturate(p2ps)
     case DagEmpty -> DagUnSaturated =>
-      log.info("DAG initialized, getting dependencies to saturate ...")
+      log.info("DAG reloaded from event log, getting dependencies to saturate ...")
       val p2ps = nextStateData.getPendingToProgressPartitions(edges)
       self ! Saturate(p2ps)
     case DagUnSaturated -> DagSaturated =>
