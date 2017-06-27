@@ -83,7 +83,7 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
 
   onTransition {
     case DagEmpty -> DagEmpty if nextStateData.getVertexStatesByPartition.isEmpty =>
-      log.info("DAG is empty, initializing  ...")
+      log.info("DAG created, initializing  ...")
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
       self ! Initialize(initialData)
     case DagSaturated -> DagUnSaturated =>
@@ -91,7 +91,7 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
       val p2ps = nextStateData.getPendingToProgressPartitions(edges)
       self ! Saturate(p2ps)
     case DagEmpty -> DagUnSaturated =>
-      log.info("DAG reloaded from event log, getting dependencies to saturate ...")
+      log.info("DAG is empty, getting dependencies to saturate ...")
       val p2ps = nextStateData.getPendingToProgressPartitions(edges)
       self ! Saturate(p2ps)
     case DagUnSaturated -> DagSaturated =>
