@@ -60,7 +60,7 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
       if (cmdQueue.lastOption.exists(_._1 == ShutDown)) {
         sender() ! Failure(AlreadyShutdownException("Shutdown was scheduled, please try later !!!"))
       } else {
-        log.warning(s"Unhandled command $c, waiting for state to become saturated ...")
+        log.warning(s"Stashing command $c, waiting for state to become saturated ...")
         cmdQueue :+= (c.asInstanceOf[Cmd] -> sender())
       }
       stay()
