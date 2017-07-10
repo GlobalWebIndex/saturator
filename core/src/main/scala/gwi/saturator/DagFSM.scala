@@ -143,7 +143,7 @@ object DagFSM {
 
   case class AlreadyShutdownException(msg: String) extends Exception(msg)
 
-  def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, name: String = "dag-fsm")
+  def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, name: String)
            (implicit arf: ActorRefFactory, edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): ActorRef = {
     arf.actorOf(Props(classOf[DagFSM], init _, handler, edges, po, vo), name)
   }

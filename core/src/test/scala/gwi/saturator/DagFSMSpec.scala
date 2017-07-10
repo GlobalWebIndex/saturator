@@ -93,7 +93,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     }
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(init, probe.ref)
+    val fsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
 
     // initial saturation
 
@@ -137,7 +137,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     // persistent state replaying
     Thread.sleep(300)
-    val newFsmActor = DagFSM(init, probe.ref)
+    val newFsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
 
     newFsmActor ! ShutDown
     expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>

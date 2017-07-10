@@ -38,7 +38,7 @@ class Example(edges: Set[(DagVertex,DagVertex)], init: => List[(DagVertex, List[
   import context.dispatcher
   var partitionCounter = lastPartition + 1
   implicit val e = edges
-  val dagFSM = DagFSM(init, self)
+  val dagFSM = DagFSM(init, self, "example-dag-fsm")
 
   val c = context.system.scheduler.schedule(interval, interval) {
     dagFSM ! CreatePartition(PartitionMock(partitionCounter.toString))
