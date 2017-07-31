@@ -8,13 +8,7 @@ import gwi.saturator.DagState.DagStateEvent
 
 import scala.math.Ordering
 import scala.reflect.ClassTag
-
-sealed trait Status extends FSMState
-object Status {
-  val Empty = "DagEmpty"
-  val DagSaturated = "DagSaturated"
-  val DagUnSaturated = "DagUnSaturated"
-}
+import DagFSM.Status
 
 class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRef)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex])
   extends PersistentFSM[Status, DagState, DagStateEvent] with LoggingPersistentFSM[Status, DagState, DagStateEvent] with ActorLogging {
@@ -124,6 +118,13 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
 }
 
 object DagFSM {
+  sealed trait Status extends FSMState
+  object Status {
+    val Empty = "DagEmpty"
+    val DagSaturated = "DagSaturated"
+    val DagUnSaturated = "DagUnSaturated"
+  }
+
   sealed trait Cmd
   case class CreatePartition(p: DagPartition) extends Cmd
   case class RemovePartitionVertex(p: DagPartition, v: DagVertex) extends Cmd
