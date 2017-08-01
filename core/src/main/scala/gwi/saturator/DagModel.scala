@@ -11,7 +11,7 @@ trait DagVertex {
 }
 
 object DagVertex {
-  object State {
+  protected[saturator] object State {
     val Pending = "Pending"
     val Complete = "Complete"
     val InProgress = "InProgress"

@@ -71,7 +71,7 @@ object DagFSM {
   case class Saturate(dep: Set[Dependency]) extends Cmd
   case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Cmd
   case object ShutDown extends Cmd
-  private case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Cmd
+  protected[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Cmd
 
   protected[saturator] case object DagEmpty extends FSMState { override def identifier: String = "Empty" }
   protected[saturator] case object Saturating extends FSMState { override def identifier: String = "Saturating" }

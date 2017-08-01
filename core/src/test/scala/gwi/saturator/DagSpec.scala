@@ -6,7 +6,7 @@ import org.scalatest.concurrent.ScalaFutures
 class DagSpec extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
   import Dag._
 
-  val edges =
+  private[this] val edges =
     Set(
       1 -> 2,
       1 -> 3,

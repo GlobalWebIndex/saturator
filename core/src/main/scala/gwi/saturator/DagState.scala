@@ -5,27 +5,30 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.math.Ordering
 
-object DagState {
+protected[saturator] object DagState {
   implicit class TreeMapPimp[A, B](underlying: TreeMap[A, B]) {
     def adjust(k: A)(f: B => B) = underlying.updated(k, f(underlying(k)))
   }
 
-  def empty(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = DagState(vertexStatesByPartition = TreeMap.empty[DagPartition, TreeMap[DagVertex, String]], depsInFlight = Set.empty[Dependency])
+  protected[saturator] def empty(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState =
+    DagState(vertexStatesByPartition = TreeMap.empty[DagPartition, TreeMap[DagVertex, String]], depsInFlight = Set.empty[Dependency])
+  protected[saturator] def initialized(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]]) =
+    DagState(vertexStatesByPartition, Set.empty)
 
-  trait DagStateEvent
-  case class StateInitializedEvent(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends DagStateEvent
-  case object SaturationInitializedEvent extends DagStateEvent
-  case class SaturationSucceededEvent(dep: Dependency) extends DagStateEvent
-  case class SaturationFailedEvent(dep: Dependency) extends DagStateEvent
-  case class PartitionCreatedEvent(p: DagPartition) extends DagStateEvent
-  case class PartitionVertexRemovedEvent(p: DagPartition, vertex: DagVertex) extends DagStateEvent
+  protected[saturator] sealed trait DagStateEvent
+  protected[saturator] case class StateInitializedEvent(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends DagStateEvent
+  protected[saturator] case object SaturationInitializedEvent extends DagStateEvent
+  protected[saturator] case class SaturationSucceededEvent(dep: Dependency) extends DagStateEvent
+  protected[saturator] case class SaturationFailedEvent(dep: Dependency) extends DagStateEvent
+  protected[saturator] case class PartitionCreatedEvent(p: DagPartition) extends DagStateEvent
+  protected[saturator] case class PartitionVertexRemovedEvent(p: DagPartition, vertex: DagVertex) extends DagStateEvent
 
   object DagStateEvent {
-    def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
+    protected[saturator] def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
   }
 }
 
-case class DagState private(private val vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], private val depsInFlight: Set[Dependency]) extends LazyLogging {
+protected[saturator] case class DagState private(private val vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], private val depsInFlight: Set[Dependency]) extends LazyLogging {
   import Dag._
   import DagState._
   import DagVertex.State._
@@ -56,15 +59,15 @@ case class DagState private(private val vertexStatesByPartition: TreeMap[DagPart
   }
 
   override def toString: String = vertexStatesByPartition.map { case (p, vertexStates) => s"$p -> ${vertexStates.mkString("\n","\n","\n")}" }.mkString("\n","\n","\n")
-  def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
-  def getVertexStatesFor(p: DagPartition): Map[DagVertex, String] = vertexStatesByPartition(p)
-  def getPendingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(Pending)
-  def getNewProgressingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(InProgress) -- depsInFlight
-  def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
+  protected[saturator] def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
+  protected[saturator] def getVertexStatesFor(p: DagPartition): Map[DagVertex, String] = vertexStatesByPartition(p)
+  protected[saturator] def getPendingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(Pending)
+  protected[saturator] def getNewProgressingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(InProgress) -- depsInFlight
+  protected[saturator] def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
     vertexStates(root(edges)) == Complete && descendantsOfRoot[DagVertex](edges, v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
   }
 
-  def updated(event: DagStateEvent)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = event match {
+  protected[saturator] def updated(event: DagStateEvent)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = event match {
     case StateInitializedEvent(partitionsByVertex) =>
       val rootVertex = Dag.root(edges)
       val rootVertexPartitions = partitionsByVertex(rootVertex)
@@ -77,7 +80,7 @@ case class DagState private(private val vertexStatesByPartition: TreeMap[DagPart
         val state = if (vertex == rootVertex || isComplete) Complete else Pending
         Dag.neighborDescendantsOf(vertex, edges).flatMap(buildGraphForPartition(p, _)).toMap + (vertex -> state)
       }
-      DagState(TreeMap(rootVertexPartitions.map(p => p -> buildGraphForPartition(p, rootVertex)).toSeq:_*), Set.empty)
+      DagState.initialized(TreeMap(rootVertexPartitions.map(p => p -> buildGraphForPartition(p, rootVertex)).toSeq:_*))
 
     case SaturationInitializedEvent =>
       def newStates =

@@ -1,6 +1,7 @@
 package gwi.saturator
 
-object Dag {
+protected[saturator] object Dag {
+
   def root[V](edges: Set[(V,V)]): V = {
     val ancestorLessVertices = edges.flatMap(v => Set(v._1, v._2)) -- edges.map(_._2)
     require(ancestorLessVertices.size == 1, "DAG must be rooted !!!")

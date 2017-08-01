@@ -10,7 +10,7 @@ import scala.language.implicitConversions
 class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
   import DagMock._
   import DagVertex.State._
-  implicit val edges: Set[(DagVertex, DagVertex)] =
+  private[this] implicit val edges: Set[(DagVertex, DagVertex)] =
     Set(
       1 -> 2,
       1 -> 3,

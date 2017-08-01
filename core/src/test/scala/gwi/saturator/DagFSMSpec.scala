@@ -34,7 +34,7 @@ object DagFSMSpec {
 
 class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with BeforeAndAfterEach with ImplicitSender {
   import DagMock._
-  val workTimeout = 10.seconds
+  private[this] val workTimeout = 10.seconds
 
   def this() = this(ActorSystem("DagFSMSpec", DagFSMSpec.config))
 
