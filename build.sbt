@@ -1,6 +1,6 @@
 
-version in ThisBuild := "0.0.4"
-crossScalaVersions in ThisBuild := Seq("2.12.1", "2.11.8")
+version in ThisBuild := "0.0.5"
+crossScalaVersions in ThisBuild := Seq("2.12.3", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi ++ Seq(akkaActor, akkaTestkit, akkaPersistence, akkaPersistenceRedis, akkaKryoSerialization, scalatest)
