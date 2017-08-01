@@ -4,7 +4,8 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import gwi.saturator.DagFSM._
-import org.scalatest.{BeforeAndAfterAll, FreeSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpecLike, Matchers}
+import redis.RedisClient
 
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
@@ -13,7 +14,7 @@ import scala.language.implicitConversions
 
 object DagFSMSpec {
   val config = ConfigFactory.parseString(
-        """
+    """
         akka {
           log-dead-letters-during-shutdown = off
           actor.warn-about-java-serializer-usage = off
@@ -31,15 +32,23 @@ object DagFSMSpec {
   ).withFallback(ConfigFactory.load())
 }
 
-class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with ImplicitSender {
+class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with BeforeAndAfterEach with ImplicitSender {
   import DagMock._
   val workTimeout = 10.seconds
 
-  def this() = this(ActorSystem("PersistentFSMSpec", DagFSMSpec.config))
+  def this() = this(ActorSystem("DagFSMSpec", DagFSMSpec.config))
+
+  private[this] var redisClient: RedisClient = null
 
   override def beforeAll(): Unit = try super.beforeAll() finally {
     startContainer("redis", "redis-test", 6379)(())
+    Thread.sleep(1000)
+    redisClient = RedisClient("localhost", 6379, name = "test-redis-client")
   }
+
+  override def afterEach(): Unit = try {
+    Await.ready(redisClient.flushall(), 2.seconds)
+  } finally super.afterAll()
 
   override def afterAll(): Unit = try {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -89,7 +98,6 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
           )
         )
       ) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-
     }
 
     val probe = TestProbe()
@@ -114,23 +122,20 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     probe.expectMsg(Saturate(TreeSet(Dependency(2L, Set(1), 2)))) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
     probe.expectMsg(Saturate(TreeSet(Dependency(2L, Set(3,2), 6)))) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
 
-
     // commands queuing
 
     (3L to 10L) foreach { p =>
       fsmActor ! CreatePartition(p)
-    }
-
-    (3L to 10L) foreach { p =>
       expectMsgType[Cmd.Submitted]
       assertSaturationOfDagForPartition(p, probe, fsmActor)
     }
 
-    // safe enqueued shutdown command
+    // shutdown command
 
     fsmActor ! ShutDown
     expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
-      assertResult(Status.DagSaturated)(status.identifier)
+      assertResult(ShutDown)(cmd)
+      assertResult(Saturating)(status)
       assert(state.getVertexStatesByPartition.size == 10)
       assert(state.isSaturated)
     }
@@ -141,7 +146,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     newFsmActor ! ShutDown
     expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
-      assertResult(Status.DagSaturated)(status.identifier)
+      assertResult(Saturating)(status)
       assert(state.getVertexStatesByPartition.size == 10)
       assert(state.isSaturated)
     }
@@ -185,7 +190,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     fsmActor ! ShutDown
     expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
-      assertResult(Status.DagSaturated)(status.identifier)
+      assertResult(Saturating)(status)
       assert(state.getVertexStatesByPartition.size == 9)
       println(state.getVertexStatesByPartition.keySet.mkString("\n"))
       assert(state.isSaturated)
