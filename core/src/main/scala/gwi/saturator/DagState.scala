@@ -59,13 +59,13 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
   }
 
   override def toString: String = vertexStatesByPartition.map { case (p, vertexStates) => s"$p -> ${vertexStates.mkString("\n","\n","\n")}" }.mkString("\n","\n","\n")
-  protected[saturator] def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
+  def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
+  def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
+    vertexStates(root(edges)) == Complete && descendantsOfRoot[DagVertex](edges, v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
+  }
   protected[saturator] def getVertexStatesFor(p: DagPartition): Map[DagVertex, String] = vertexStatesByPartition(p)
   protected[saturator] def getPendingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(Pending)
   protected[saturator] def getNewProgressingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(InProgress) -- depsInFlight
-  protected[saturator] def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
-    vertexStates(root(edges)) == Complete && descendantsOfRoot[DagVertex](edges, v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
-  }
 
   protected[saturator] def updated(event: DagStateEvent)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = event match {
     case StateInitializedEvent(partitionsByVertex) =>
