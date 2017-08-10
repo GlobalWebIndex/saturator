@@ -18,7 +18,7 @@ object Launcher extends CliMain[Unit] {
     Read.reads("edges")(_.split(",").filter(_.nonEmpty).map(_.split("-")).map(arr => VertexMock(arr(0)) -> VertexMock(arr(1))).toList)
 
   var edges = arg[List[(DagVertex,DagVertex)]]()
-  var existingHeadPartitions = arg[List[Int]](required = true, name = "existing-head-partitions")
+  var existingHeadPartitions = arg[List[Int]](name = "existing-head-partitions")
   var newPartitionInterval = arg[Int](name = "new-partition-interval")
 
   private val config = ConfigFactory.parseString(
