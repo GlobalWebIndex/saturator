@@ -37,6 +37,13 @@ P4 --------->  |               |  |                +--------------->  |
 - P1-4 = Partitions
 - X1-3 = Missing partitions, ie. graph edge P3 - X3 is a dependency that needs to be satisfied
 
+### Use case
+
+This system was designed to orchestrate an ETL pipeline or a system of microservices, it could be used together with [mawex](https://github.com/GlobalWebIndex/mawex)
+as a task/job execution engine. Ie. your pipeline would let :
+ - saturator decide what should be done
+ - mawex take care about the actual ETL job or microservice execution
+
 ### how-to
 
 ```
