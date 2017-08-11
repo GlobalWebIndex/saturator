@@ -5,7 +5,6 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpec, Matchers}
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.collection.immutable.{TreeMap, TreeSet}
-import scala.language.implicitConversions
 
 class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
   import DagMock._

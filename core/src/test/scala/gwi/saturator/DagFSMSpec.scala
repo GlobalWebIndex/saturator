@@ -10,7 +10,6 @@ import redis.RedisClient
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.language.implicitConversions
 
 object DagFSMSpec {
   val config = ConfigFactory.parseString(
@@ -49,7 +48,6 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
   } finally super.afterAll()
 
   override def afterAll(): Unit = try {
-    import scala.concurrent.ExecutionContext.Implicits.global
     stopContainer("redis-test")(())
     Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf)
   } finally super.afterAll()
