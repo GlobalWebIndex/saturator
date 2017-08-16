@@ -10,7 +10,7 @@ protected[saturator] object DagState {
     def adjust(k: A)(f: B => B) = underlying.updated(k, f(underlying(k)))
   }
 
-  protected[saturator] def empty(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState =
+  protected[saturator] def empty(implicit po: Ordering[DagPartition]): DagState =
     DagState(vertexStatesByPartition = TreeMap.empty[DagPartition, TreeMap[DagVertex, String]], depsInFlight = Set.empty[Dependency])
   protected[saturator] def initialized(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]]) =
     DagState(vertexStatesByPartition, Set.empty)
