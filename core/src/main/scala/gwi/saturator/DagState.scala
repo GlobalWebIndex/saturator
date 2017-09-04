@@ -1,9 +1,13 @@
 package gwi.saturator
 
+import com.github.mdr.ascii.graph.Graph
+import com.github.mdr.ascii.layout.GraphLayout
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.math.Ordering
+
+import collection.breakOut
 
 protected[saturator] object DagState {
   implicit class TreeMapPimp[A, B](underlying: TreeMap[A, B]) {
@@ -54,11 +58,25 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
     val partitionStateByVertex = vertexStatesByPartition(p)
     require(
       sourceVertices.forall(partitionStateByVertex(_) == Complete) && partitionStateByVertex(targetVertex) == InProgress && partitionStateByVertex.filterKeys(neighborDescendants.contains).forall(_._2 == Pending),
-      s"Illegal inProgressToComplete state of $p from $sourceVertices to $targetVertex : ${partitionStateByVertex.mkString("\n", "\n", "\n")}"
+      s"Illegal inProgressToComplete state of $p from $sourceVertices to $targetVertex:\n${mkString(p).get}"
     )
   }
 
-  override def toString: String = vertexStatesByPartition.map { case (p, vertexStates) => s"$p -> ${vertexStates.mkString("\n","\n","\n")}" }.mkString("\n","\n","\n")
+  def printable(implicit edges: Set[(DagVertex, DagVertex)]): Map[String, String] =
+    vertexStatesByPartition.keySet.map { p =>
+      p.pid -> mkString(p).get
+    }(breakOut)
+
+  def mkString(p: DagPartition)(implicit edges: Set[(DagVertex, DagVertex)]): Option[String] =
+    vertexStatesByPartition.get(p).map { vertexStates =>
+      val stateByVertex = vertexStates.map { case (v, state) => v.vid -> state }
+      val edgesWithState: List[(String, String)] = edges.map(t => t._1.vid -> t._2.vid).map { case (f,t) => s"$f\n${stateByVertex(f)}" -> s"$t\n${stateByVertex(t)}" }(breakOut)
+      val verticesWithState: Set[String] = stateByVertex.map { case (v, state) => s"$v\n$state"}(breakOut)
+      GraphLayout.renderGraph(Graph(verticesWithState, edgesWithState))
+    }
+
+  def mkString(implicit edges: Set[(DagVertex, DagVertex)]): String = printable.map { case (p,graph) => s"-----------------$p-----------------\n$graph"}.mkString("\n","\n","\n")
+
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
   def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
     vertexStates(root(edges)) == Complete && descendantsOfRoot[DagVertex](edges, v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
@@ -88,7 +106,7 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
           acc.adjust(p) { partitionStateByVertex =>
               require(
                 partitionStateByVertex(targetVertex) == Pending && sourceVertices.forall(partitionStateByVertex(_) == Complete),
-                s"Illegal dag state of Pending2Progress $d\n: ${acc(p).mkString("\n","\n","\n")}"
+                s"Illegal dag state of Pending2Progress $d :\n${mkString(p).get}"
               )
               partitionStateByVertex.updated(targetVertex, InProgress)
             }
@@ -111,8 +129,8 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
     case PartitionVertexRemovedEvent(p, vertex) =>
       val rootVertex = Dag.root(edges)
       val partitionStateByVertex = vertexStatesByPartition(p)
-      require(vertex != rootVertex && partitionStateByVertex(vertex) == Complete, s"$p cannot be invalidated in root vertex or in vertex where it is not Complete : ${partitionStateByVertex.mkString("\n","\n","\n")}")
-      require(ancestorsOf(vertex, edges).map(partitionStateByVertex).forall(_ == Complete), s"Completed $p in $vertex must have Complete ancestors : ${partitionStateByVertex.mkString("\n","\n","\n")}")
+      require(vertex != rootVertex && partitionStateByVertex(vertex) == Complete, s"$p cannot be invalidated in root vertex or in vertex where it is not Complete :\n${mkString(p).get}")
+      require(ancestorsOf(vertex, edges).map(partitionStateByVertex).forall(_ == Complete), s"Completed $p in $vertex must have Complete ancestors :\n${mkString(p).get}")
       val toBePendingVertices = descendantsOf(vertex, edges) + vertex
       copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
   }

@@ -188,7 +188,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
       assertResult(Saturating)(status)
       assert(state.getVertexStatesByPartition.size == 9)
-      println(state.getVertexStatesByPartition.keySet.mkString("\n"))
+      println(state.mkString)
       assert(state.isSaturated)
     }
 
