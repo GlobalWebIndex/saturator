@@ -34,8 +34,8 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
     case Event(c@RemovePartitionVertex(partition, vertex), _) =>
       goto(Saturating) applying (PartitionVertexRemovedEvent(partition, vertex), SaturationInitializedEvent) replying  Cmd.Submitted(c, stateName, stateData, getLog)
 
-    case Event(c@GetState, stateData) =>
-      stay() replying Cmd.Submitted(c, stateName, stateData, getLog)
+    case Event(GetState, stateData) =>
+      stay() replying Cmd.Submitted(GetState, stateName, stateData, getLog)
 
     case Event(ShutDown, _) =>
       stop() replying Cmd.Submitted(ShutDown, stateName, stateData, getLog)
