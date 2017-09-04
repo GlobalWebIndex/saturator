@@ -34,6 +34,9 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
     case Event(c@RemovePartitionVertex(partition, vertex), _) =>
       goto(Saturating) applying (PartitionVertexRemovedEvent(partition, vertex), SaturationInitializedEvent) replying  Cmd.Submitted(c, stateName, stateData, getLog)
 
+    case Event(c@GetState, stateData) =>
+      stay() replying Cmd.Submitted(c, stateName, stateData, getLog)
+
     case Event(ShutDown, _) =>
       stop() replying Cmd.Submitted(ShutDown, stateName, stateData, getLog)
   }
@@ -70,9 +73,9 @@ object DagFSM {
   case class RemovePartitionVertex(p: DagPartition, v: DagVertex) extends Cmd
   case class Saturate(dep: Set[Dependency]) extends Cmd
   case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Cmd
+  case object GetState extends Cmd
   case object ShutDown extends Cmd
   protected[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Cmd
-
   protected[saturator] case object DagEmpty extends FSMState { override def identifier: String = "Empty" }
   protected[saturator] case object Saturating extends FSMState { override def identifier: String = "Saturating" }
 

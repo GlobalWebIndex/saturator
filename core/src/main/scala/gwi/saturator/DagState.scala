@@ -62,9 +62,9 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
     )
   }
 
-  def printable(implicit edges: Set[(DagVertex, DagVertex)]): Map[String, String] =
-    vertexStatesByPartition.keySet.map { p =>
-      p.pid -> mkString(p).get
+  def printable(implicit edges: Set[(DagVertex, DagVertex)]): Map[String, DagPartition.State] =
+    vertexStatesByPartition.map { case (p, vertexStates) =>
+      p.pid -> DagPartition.State(mkString(p).get, vertexStates.values)
     }(breakOut)
 
   def mkString(p: DagPartition)(implicit edges: Set[(DagVertex, DagVertex)]): Option[String] =
@@ -75,7 +75,7 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
       GraphLayout.renderGraph(Graph(verticesWithState, edgesWithState))
     }
 
-  def mkString(implicit edges: Set[(DagVertex, DagVertex)]): String = printable.map { case (p,graph) => s"-----------------$p-----------------\n$graph"}.mkString("\n","\n","\n")
+  def mkString(implicit edges: Set[(DagVertex, DagVertex)]): String = printable.map { case (p,graph) => s"-----------------$p-----------------\n${graph.serializedVertex}"}.mkString("\n","\n","\n")
 
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
   def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>

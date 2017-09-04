@@ -1,5 +1,6 @@
 package gwi.saturator
 
+import scala.collection.Iterable
 import scala.math.Ordering
 
 trait DagPartition {
@@ -8,6 +9,22 @@ trait DagPartition {
 
 trait DagVertex {
   def vid: String
+}
+
+object DagPartition {
+  sealed trait State {
+    def serializedVertex: String
+  }
+  case class Progressing(serializedVertex: String) extends State
+  case class Complete(serializedVertex: String) extends State
+  case class Failed(serializedVertex: String) extends State
+  object State {
+    def apply(serializedVertex: String, states: Iterable[String]): State = states.toSet match {
+      case xs if xs.size == 1 && xs.head == DagVertex.State.Complete => Complete(serializedVertex)
+      case xs if xs.contains(DagVertex.State.Failed) => Failed(serializedVertex)
+      case _ => Progressing(serializedVertex)
+    }
+  }
 }
 
 object DagVertex {
