@@ -115,11 +115,15 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
 
     case SaturationSucceededEvent(dep@Dependency(p, sourceVertices, targetVertex)) =>
       saturationSanityCheck(p, sourceVertices, targetVertex)
-      copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Complete)), depsInFlight = depsInFlight - dep)
+      val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Complete)), depsInFlight = depsInFlight - dep)
+      logger.info(s"Saturation of dependency succeeded : $dep\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
+      newState
 
     case SaturationFailedEvent(dep@Dependency(p, sourceVertices, targetVertex)) =>
       saturationSanityCheck(p, sourceVertices, targetVertex)
-      copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Failed)), depsInFlight = depsInFlight - dep)
+      val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Failed)), depsInFlight = depsInFlight - dep)
+      logger.info(s"Saturation of dependency failed : $dep\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
+      newState
 
     case PartitionCreatedEvent(p) =>
       val rootVertex = Dag.root(edges)
@@ -132,7 +136,9 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
       require(vertex != rootVertex && partitionStateByVertex(vertex) == Complete, s"$p cannot be invalidated in root vertex or in vertex where it is not Complete :\n${mkString(p).get}")
       require(ancestorsOf(vertex, edges).map(partitionStateByVertex).forall(_ == Complete), s"Completed $p in $vertex must have Complete ancestors :\n${mkString(p).get}")
       val toBePendingVertices = descendantsOf(vertex, edges) + vertex
-      copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
+      val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
+      logger.info(s"Vertex $vertex of partition $p removed :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
+      newState
   }
 
 }
