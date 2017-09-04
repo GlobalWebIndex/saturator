@@ -15,7 +15,7 @@ lazy val `saturator-api` = (project in file("api"))
 lazy val `saturator-core` = (project in file("core"))
   .enablePlugins(CommonPlugin)
   .settings(name := "saturator-core")
-  .settings(libraryDependencies ++= loggingApi ++ Seq(asciiGraphs, akkaActor, akkaPersistence, akkaPersistenceRedis, akkaKryoSerialization, akkaTestkit, scalatest))
+  .settings(libraryDependencies ++= loggingApi ++ Seq(asciiGraphs, akkaActor, akkaPersistence, akkaPersistenceRedis, akkaKryoSerialization, akkaTestkit, scalatest, loggingImplLog4j % "test"))
   .settings(publishSettings("GlobalWebIndex", "saturator-core", s3Resolver))
   .dependsOn(`saturator-api` % "compile->compile;test->test")
 
