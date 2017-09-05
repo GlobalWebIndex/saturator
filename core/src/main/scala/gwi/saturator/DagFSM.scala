@@ -3,8 +3,8 @@ package gwi.saturator
 import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Props}
 import akka.persistence.fsm.PersistentFSM.{FSMState, LogEntry}
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
-import gwi.saturator.DagState.DagStateEvent
 import gwi.saturator.DagFSM._
+import gwi.saturator.DagState.DagStateEvent
 
 import scala.math.Ordering
 import scala.reflect.ClassTag
@@ -25,14 +25,14 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
   }
 
   when(Saturating) {
-    case Event(SaturationResponse(dep, succeeded), _) =>
-      goto(Saturating) applying(DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent)
+    case Event(c@SaturationResponse(dep, succeeded), _) =>
+      goto(Saturating) applying (DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(c@CreatePartition(partition), _) =>
       goto(Saturating) applying (PartitionCreatedEvent(partition), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(c@RemovePartitionVertex(partition, vertex), _) =>
-      goto(Saturating) applying (PartitionVertexRemovedEvent(partition, vertex), SaturationInitializedEvent) replying  Cmd.Submitted(c, stateName, stateData, getLog)
+      goto(Saturating) applying (PartitionVertexRemovedEvent(partition, vertex), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(GetState, stateData) =>
       stay() replying Cmd.Submitted(GetState, stateName, stateData, getLog)
@@ -46,11 +46,15 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
       log.info("DAG created, initializing ...")
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
       self ! Initialize(initialData)
-    case _ -> Saturating =>
+    case x -> Saturating =>
       val deps = nextStateData.getNewProgressingDeps
+      if (x == DagEmpty) {
+        log.info(s"Dag initialized ...")
+        handler ! Cmd.Issued(Initialized, stateName, nextStateData, getLog)
+      }
       if (deps.nonEmpty) {
         log.info(s"Saturating ${deps.size} dependencies ...")
-        handler ! Saturate(deps)
+        handler ! Cmd.Issued(Saturate(deps), stateName, nextStateData, getLog)
       }
   }
 
@@ -69,18 +73,33 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
 
 object DagFSM {
   sealed trait Cmd
-  case class CreatePartition(p: DagPartition) extends Cmd
-  case class RemovePartitionVertex(p: DagPartition, v: DagVertex) extends Cmd
-  case class Saturate(dep: Set[Dependency]) extends Cmd
-  case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Cmd
-  case object GetState extends Cmd
-  case object ShutDown extends Cmd
-  protected[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Cmd
+  sealed trait Incoming extends Cmd
+  sealed trait Outgoing extends Cmd
+  sealed trait Internal extends Cmd
+
+  protected[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Internal
+
+  case class Saturate(dep: Set[Dependency]) extends Outgoing
+  case object Initialized extends Outgoing
+
+  case class CreatePartition(p: DagPartition) extends Incoming
+  case class RemovePartitionVertex(p: DagPartition, v: DagVertex) extends Incoming
+  case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Incoming
+  case object GetState extends Incoming
+  case object ShutDown extends Incoming
+
   protected[saturator] case object DagEmpty extends FSMState { override def identifier: String = "Empty" }
   protected[saturator] case object Saturating extends FSMState { override def identifier: String = "Saturating" }
 
   object Cmd {
-    case class Submitted(cmd: Cmd, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]])
+    sealed trait CmdContainer[T <: Cmd] {
+      def cmd: T
+      def status: FSMState
+      def state: DagState
+      def log: IndexedSeq[LogEntry[FSMState, DagState]]
+    }
+    case class Submitted(cmd: Incoming, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[Incoming]
+    case class Issued(cmd: Outgoing, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[Outgoing]
   }
 
   def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, name: String)

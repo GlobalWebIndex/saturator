@@ -1,6 +1,6 @@
 package gwi.saturator
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import gwi.saturator.DagFSM._
@@ -67,63 +67,60 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
         4 -> 7
       )
 
-    def assertSaturationOfDagForPartition(p: DagPartition, probe: TestProbe, fsmActor: ActorRef) = {
-      probe.expectMsg(
-        Saturate(
-          TreeSet(
-            Dependency(p, Set(1), 2),
-            Dependency(p, Set(1), 3),
-            Dependency(p, Set(1), 4),
-            Dependency(p, Set(1), 5)
-          )
-        )
-      ) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-
-      probe.expectMsg(
-        Saturate(
-          TreeSet(
-            Dependency(p, Set(3,2), 6)
-          )
-        )
-      ) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-
-      probe.expectMsg(
-        Saturate(
-          TreeSet(
-            Dependency(p, Set(4), 7)
-          )
-        )
-      ) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    }
-
     val probe = TestProbe()
     val fsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
+    assertResult(Initialized)(probe.expectMsgType[Cmd.Issued].cmd)
+
+    def handleIssuedCmd(expectedDeps: Set[Dependency]): Unit =
+      probe.expectMsgType[Cmd.Issued] match {
+        case Cmd.Issued(Saturate(deps),_,_,_) if deps == expectedDeps =>
+          deps.foreach { dep =>
+            fsmActor ! SaturationResponse(dep, true)
+            expectMsgType[Cmd.Submitted]
+          }
+        case x =>
+          sys.error(s"Unexpected message $x")
+      }
+
+
+    def assertSaturationOfDagForPartition(p: DagPartition) = {
+      handleIssuedCmd(
+        TreeSet(
+          Dependency(p, Set(1), 2),
+          Dependency(p, Set(1), 3),
+          Dependency(p, Set(1), 4),
+          Dependency(p, Set(1), 5)
+        )
+      )
+      handleIssuedCmd(TreeSet(Dependency(p, Set(3,2), 6)))
+      handleIssuedCmd(TreeSet(Dependency(p, Set(4), 7)))
+    }
 
     // initial saturation
 
-    assertSaturationOfDagForPartition(1L, probe, fsmActor)
+    assertSaturationOfDagForPartition(1L)
 
     // saturation after adding new partition
 
     fsmActor ! CreatePartition(2L)
     expectMsgType[Cmd.Submitted]
 
-    assertSaturationOfDagForPartition(2L, probe, fsmActor)
+    assertSaturationOfDagForPartition(2L)
 
     // saturation after removing a partition vertex
 
     fsmActor ! RemovePartitionVertex(2L, 2)
     expectMsgType[Cmd.Submitted]
 
-    probe.expectMsg(Saturate(TreeSet(Dependency(2L, Set(1), 2)))) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    probe.expectMsg(Saturate(TreeSet(Dependency(2L, Set(3,2), 6)))) match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
+    handleIssuedCmd(TreeSet(Dependency(2L, Set(1), 2)))
+    handleIssuedCmd(TreeSet(Dependency(2L, Set(3,2), 6)))
 
     // commands queuing
 
     (3L to 10L) foreach { p =>
       fsmActor ! CreatePartition(p)
       expectMsgType[Cmd.Submitted]
-      assertSaturationOfDagForPartition(p, probe, fsmActor)
+      assertSaturationOfDagForPartition(p)
     }
 
     // shutdown command
@@ -174,15 +171,26 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     val probe = TestProbe()
     val fsmActor = DagFSM(init, probe.ref, "dag-fsm-2")
+    assertResult(Initialized)(probe.expectMsgType[Cmd.Issued].cmd)
 
-    probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
-    probe.expectMsgType[Saturate] match { case Saturate(deps) => deps.foreach(dep => fsmActor ! SaturationResponse(dep, true)) }
+    def handleIssuedCmd(): Unit =
+      probe.expectMsgType[Cmd.Issued] match {
+        case Cmd.Issued(Saturate(deps),_,_,_) =>
+          deps.foreach { dep =>
+            fsmActor ! SaturationResponse(dep, true)
+            expectMsgType[Cmd.Submitted]
+          }
+        case x =>
+          sys.error(s"Unexpected message $x")
+      }
 
+    handleIssuedCmd()
+    handleIssuedCmd()
+    handleIssuedCmd()
+    handleIssuedCmd()
+    handleIssuedCmd()
+    handleIssuedCmd()
+    handleIssuedCmd()
 
     fsmActor ! ShutDown
     expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
