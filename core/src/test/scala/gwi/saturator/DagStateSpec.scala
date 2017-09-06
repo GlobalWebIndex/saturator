@@ -163,6 +163,15 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
     assert(!actualState.isSaturated)
   }
 
+  "recreate partition" in {
+    val initialState = (1 to 7).map(_ -> Pending).toMap ++ Set(1,3,4).map(_ -> Complete) ++ Map(2 -> Failed)
+    val state = DagState(TreeMap((1L, initialState)), Set.empty)
+    val expectedState: Map[DagVertex, String] = (1 to 7).map(_ -> Pending).toMap ++ Map(1 -> Complete)
+    val actualState = state.updated(PartitionRecreatedEvent(1L))
+    assertResult(expectedState)(actualState.getVertexStatesFor(1L))
+    assert(!actualState.isSaturated)
+  }
+
   "error handling" - {
     "failing leaf dependency" in {
       val initialState = (1 to 7).map(_ -> Complete).toMap ++ Map(7 -> InProgress)

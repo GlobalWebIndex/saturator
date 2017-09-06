@@ -123,6 +123,13 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     assertSaturationOfDagForPartition(2L)
 
+    // saturation after recreating a partition
+
+    fsmActor ! RecreatePartition(2L)
+    expectMsgType[Cmd.Submitted]
+
+    assertSaturationOfDagForPartition(2L)
+
     // commands queuing
 
     (3L to 10L) foreach { p =>

@@ -29,6 +29,7 @@ protected[saturator] object DagState {
   sealed trait AdhocEvent extends DagStateEvent
   protected[saturator] case class DagBranchRedoEvent(p: DagPartition, vertex: Option[DagVertex]) extends AdhocEvent
   protected[saturator] case class PartitionFixEvent(p: DagPartition) extends AdhocEvent
+  protected[saturator] case class PartitionRecreatedEvent(p: DagPartition) extends AdhocEvent
 
   object DagStateEvent {
     protected[saturator] def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
@@ -153,6 +154,14 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
       val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
       logger.info(s"Partition $p is to be fixed :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
       newState
+
+    case PartitionRecreatedEvent(p) =>
+      val rootVertex = Dag.root(edges)
+      val partitionStateByVertex = vertexStatesByPartition.getOrElse(p, throw new IllegalStateException(s"Recreating partition $p that doesn't exist !!!"))
+      require(!descendantsOf(rootVertex, edges).map(partitionStateByVertex).contains(InProgress), s"Recreating progressing partition $p is not allowed :\n${mkString(p).get}")
+      val newPartitionStateByVertex = allVertices(edges).map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
+      copy(vertexStatesByPartition = vertexStatesByPartition + (p -> newPartitionStateByVertex))
+
   }
 
 }
