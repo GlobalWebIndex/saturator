@@ -28,6 +28,7 @@ protected[saturator] object DagState {
 
   sealed trait AdhocEvent extends DagStateEvent
   protected[saturator] case class DagBranchRedoEvent(p: DagPartition, vertex: Option[DagVertex]) extends AdhocEvent
+  protected[saturator] case class PartitionFixEvent(p: DagPartition) extends AdhocEvent
 
   object DagStateEvent {
     protected[saturator] def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
@@ -140,7 +141,17 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
       require(ancestorsOf(vertex, edges).map(partitionStateByVertex).forall(_ == Complete), s"Completed $vertex in $p must have Complete ancestors :\n${mkString(p).get}")
       require(toBePendingVertices.map(partitionStateByVertex).forall(_ == Complete), s"Completed $vertex in $p must have Complete descendants :\n${mkString(p).get}")
       val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
-      logger.info(s"Dag branch from $vertex (excluding) of partition $p redone :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
+      logger.info(s"Dag branch from $vertex of partition $p is to be redone :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
+      newState
+
+    case PartitionFixEvent(p) =>
+      val rootVertex = Dag.root(edges)
+      val partitionStateByVertex = vertexStatesByPartition(p)
+      val rootDescendants = descendantsOf(rootVertex, edges)
+      require(!rootDescendants.map(partitionStateByVertex).contains(InProgress), s"Fixing progressing partition $p is not allowed :\n${mkString(p).get}")
+      val toBePendingVertices = rootDescendants.filter(partitionStateByVertex(_) == Failed)
+      val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
+      logger.info(s"Partition $p is to be fixed :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
       newState
   }
 

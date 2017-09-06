@@ -154,6 +154,35 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
   }
 
+  "testing partition fixing" in {
+    def init: List[(Int, List[Long])] = List(1 -> List(1L))
+    val probe = TestProbe()
+    val fsmActor = DagFSM(init, probe.ref, "dag-fsm-2")
+    assertResult(Initialized)(probe.expectMsgType[Cmd.Issued].cmd)
+
+    def assertSaturationOfDagForPartition(p: DagPartition) = {
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)),
+        Some(
+          TreeSet(
+            Dependency(p, Set(1), 2),
+            Dependency(p, Set(1), 3),
+            Dependency(p, Set(1), 4),
+            Dependency(p, Set(1), 5)
+          )
+        )
+      )
+      handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(p, Set(4), 7))))
+    }
+
+    assertSaturationOfDagForPartition(1L)
+
+    fsmActor ! FixPartition(1L)
+    expectMsgType[Cmd.Submitted]
+
+    handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(1L, Set(1), 2))))
+    handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(1L, Set(3,2), 6))))
+  }
+
   "testing multiple partition saturation roughly" in {
     def init: List[(Int, List[Long])] =
       List(
