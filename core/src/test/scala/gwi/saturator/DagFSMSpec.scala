@@ -109,7 +109,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     // saturation after removing a partition vertex
 
-    fsmActor ! RemovePartitionVertex(2L, 2)
+    fsmActor ! RedoDagBranch(2L, 2)
     expectMsgType[Cmd.Submitted]
 
     handleIssuedCmd(TreeSet(Dependency(2L, Set(1), 2)))

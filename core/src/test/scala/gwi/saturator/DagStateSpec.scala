@@ -145,11 +145,11 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
     assert(!actualState.isSaturated)
   }
 
-  "invalidate partition with DAG state properly set" in {
+  "redo dag branch" in {
     val initialState = (1 to 7).map(_ -> Complete).toMap
     val state = DagState(TreeMap((1L, initialState)), Set.empty)
     val expectedState: Map[DagVertex, String] = initialState ++ Set(4,7).map(_ -> Pending)
-    val actualState = state.updated(PartitionVertexRemovedEvent(1L, 4))
+    val actualState = state.updated(DagBranchRedoEvent(1L, 4))
     assertResult(expectedState)(actualState.getVertexStatesFor(1L))
     assert(!actualState.isSaturated)
   }

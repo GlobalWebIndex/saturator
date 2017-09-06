@@ -25,7 +25,9 @@ protected[saturator] object DagState {
   protected[saturator] case class SaturationSucceededEvent(dep: Dependency) extends DagStateEvent
   protected[saturator] case class SaturationFailedEvent(dep: Dependency) extends DagStateEvent
   protected[saturator] case class PartitionCreatedEvent(p: DagPartition) extends DagStateEvent
-  protected[saturator] case class PartitionVertexRemovedEvent(p: DagPartition, vertex: DagVertex) extends DagStateEvent
+
+  sealed trait AdhocEvent extends DagStateEvent
+  protected[saturator] case class DagBranchRedoEvent(p: DagPartition, vertex: DagVertex) extends AdhocEvent
 
   object DagStateEvent {
     protected[saturator] def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
@@ -104,12 +106,12 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
       def newStates =
         getPendingDeps.foldLeft(vertexStatesByPartition) { case (acc, d@Dependency(p, sourceVertices, targetVertex)) =>
           acc.adjust(p) { partitionStateByVertex =>
-              require(
-                partitionStateByVertex(targetVertex) == Pending && sourceVertices.forall(partitionStateByVertex(_) == Complete),
-                s"Illegal dag state of Pending2Progress $d :\n${mkString(p).get}"
-              )
-              partitionStateByVertex.updated(targetVertex, InProgress)
-            }
+            require(
+              partitionStateByVertex(targetVertex) == Pending && sourceVertices.forall(partitionStateByVertex(_) == Complete),
+              s"Illegal dag state of Pending2Progress $d :\n${mkString(p).get}"
+            )
+            partitionStateByVertex.updated(targetVertex, InProgress)
+          }
         }
       copy(vertexStatesByPartition = newStates, depsInFlight = depsInFlight ++ getNewProgressingDeps)
 
@@ -130,14 +132,14 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
       val partitionStateByVertex = allVertices(edges).map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
       copy(vertexStatesByPartition = vertexStatesByPartition + (p -> partitionStateByVertex))
 
-    case PartitionVertexRemovedEvent(p, vertex) =>
+    case DagBranchRedoEvent(p, vertex) =>
       val rootVertex = Dag.root(edges)
       val partitionStateByVertex = vertexStatesByPartition(p)
-      require(vertex != rootVertex && partitionStateByVertex(vertex) == Complete, s"$p cannot be invalidated in root vertex or in vertex where it is not Complete :\n${mkString(p).get}")
-      require(ancestorsOf(vertex, edges).map(partitionStateByVertex).forall(_ == Complete), s"Completed $p in $vertex must have Complete ancestors :\n${mkString(p).get}")
+      require(vertex != rootVertex && partitionStateByVertex(vertex) == Complete, s"Dag branch cannot be redone at $p in root vertex or in vertex where it is not Complete :\n${mkString(p).get}")
+      require(ancestorsOf(vertex, edges).map(partitionStateByVertex).forall(_ == Complete), s"Completed $vertex in $p must have Complete ancestors :\n${mkString(p).get}")
       val toBePendingVertices = descendantsOf(vertex, edges) + vertex
       val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
-      logger.info(s"Vertex $vertex of partition $p removed :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
+      logger.info(s"Dag branch from $vertex of partition $p redone :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
       newState
   }
 

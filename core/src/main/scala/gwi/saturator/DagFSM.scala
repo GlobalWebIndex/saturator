@@ -31,8 +31,8 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
     case Event(c@CreatePartition(partition), _) =>
       goto(Saturating) applying (PartitionCreatedEvent(partition), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
 
-    case Event(c@RemovePartitionVertex(partition, vertex), _) =>
-      goto(Saturating) applying (PartitionVertexRemovedEvent(partition, vertex), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
+    case Event(c@RedoDagBranch(partition, vertex), _) =>
+      goto(Saturating) applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(GetState, stateData) =>
       stay() replying Cmd.Submitted(GetState, stateName, stateData, getLog)
@@ -83,7 +83,7 @@ object DagFSM {
   case object Initialized extends Outgoing
 
   case class CreatePartition(p: DagPartition) extends Incoming
-  case class RemovePartitionVertex(p: DagPartition, v: DagVertex) extends Incoming
+  case class RedoDagBranch(p: DagPartition, v: DagVertex) extends Incoming
   case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Incoming
   case object GetState extends Incoming
   case object ShutDown extends Incoming
