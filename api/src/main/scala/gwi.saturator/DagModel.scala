@@ -13,16 +13,16 @@ trait DagVertex {
 
 object DagPartition {
   sealed trait State {
-    def serializedVertex: String
+    def serializedGraph: String
   }
-  case class Progressing(serializedVertex: String) extends State
-  case class Complete(serializedVertex: String) extends State
-  case class Failed(serializedVertex: String) extends State
+  case class Progressing(serializedGraph: String) extends State
+  case class Complete(serializedGraph: String) extends State
+  case class Failed(serializedGraph: String) extends State
   object State {
-    def apply(serializedVertex: String, states: Iterable[String]): State = states.toSet match {
-      case xs if xs.size == 1 && xs.head == DagVertex.State.Complete => Complete(serializedVertex)
-      case xs if xs.contains(DagVertex.State.Failed) => Failed(serializedVertex)
-      case _ => Progressing(serializedVertex)
+    def apply(serializedGraph: String, states: Iterable[String]): State = states.toSet match {
+      case xs if xs.size == 1 && xs.head == DagVertex.State.Complete => Complete(serializedGraph)
+      case xs if xs.contains(DagVertex.State.Failed) => Failed(serializedGraph)
+      case _ => Progressing(serializedGraph)
     }
   }
 }
