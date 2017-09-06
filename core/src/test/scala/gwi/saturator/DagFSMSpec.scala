@@ -52,20 +52,20 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf)
   } finally super.afterAll()
 
+  implicit val edges: Set[(DagVertex, DagVertex)] =
+    Set(
+      1 -> 2,
+      1 -> 3,
+      1 -> 4,
+      1 -> 5,
+      2 -> 6,
+      3 -> 6,
+      4 -> 7
+    )
+
   "testing one partition saturation thoroughly" in {
 
     def init: List[(Int, List[Long])] = List(1 -> List(1L))
-
-    implicit val edges: Set[(DagVertex, DagVertex)] =
-      Set(
-        1 -> 2,
-        1 -> 3,
-        1 -> 4,
-        1 -> 5,
-        2 -> 6,
-        3 -> 6,
-        4 -> 7
-      )
 
     val probe = TestProbe()
     val fsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
@@ -163,17 +163,6 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
         5 -> (1L to 3L).toList,
         6 -> List(1L),
         7 -> List(1L)
-      )
-
-    implicit val edges: Set[(DagVertex, DagVertex)] =
-      Set(
-        1 -> 2,
-        1 -> 3,
-        1 -> 4,
-        1 -> 5,
-        2 -> 6,
-        3 -> 6,
-        4 -> 7
       )
 
     val probe = TestProbe()
