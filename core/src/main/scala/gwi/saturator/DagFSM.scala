@@ -83,7 +83,7 @@ object DagFSM {
   case object Initialized extends Outgoing
 
   case class CreatePartition(p: DagPartition) extends Incoming
-  case class RedoDagBranch(p: DagPartition, v: DagVertex) extends Incoming
+  case class RedoDagBranch(p: DagPartition, v: Option[DagVertex]) extends Incoming
   case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Incoming
   case object GetState extends Incoming
   case object ShutDown extends Incoming
