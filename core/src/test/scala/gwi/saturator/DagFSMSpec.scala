@@ -95,6 +95,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
       )
       handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(p, Set(3,2), 6))))
       handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(p, Set(4), 7))))
+      assertResult(Saturated)(probe.expectMsgType[SaturatorCmd.Issued].cmd)
     }
 
     // initial saturation
@@ -115,6 +116,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(1), 2))))
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(3,2), 6))))
+    assertResult(Saturated)(probe.expectMsgType[SaturatorCmd.Issued].cmd)
 
     // saturation after redoing whole Dag descending from the root vertex
 
@@ -179,6 +181,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
         )
       )
       handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(p, Set(4), 7))))
+      assertResult(Saturated)(probe.expectMsgType[SaturatorCmd.Issued].cmd)
     }
 
     assertSaturationOfDagForPartition(1L)

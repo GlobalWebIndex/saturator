@@ -53,14 +53,17 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
       self ! Initialize(initialData)
     case x -> Saturating =>
-      val deps = nextStateData.getNewProgressingDeps
       if (x == DagEmpty) {
         log.info(s"Dag initialized ...")
         handler ! SaturatorCmd.Issued(Initialized, stateName, nextStateData, getLog)
       }
+      val deps = nextStateData.getNewProgressingDeps
       if (deps.nonEmpty) {
         log.info(s"Saturating ${deps.size} dependencies ...")
         handler ! SaturatorCmd.Issued(Saturate(deps), stateName, nextStateData, getLog)
+      } else if (nextStateData.isSaturated) {
+        log.info(s"Dag is fully saturated ...")
+        handler ! SaturatorCmd.Issued(Saturated, stateName, nextStateData, getLog)
       }
   }
 
@@ -86,6 +89,7 @@ object DagFSM {
   protected[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Internal
 
   case class Saturate(dep: Set[Dependency]) extends Outgoing
+  case object Saturated extends Outgoing
   case object Initialized extends Outgoing
 
   case class CreatePartition(p: DagPartition) extends Incoming
