@@ -26,25 +26,25 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
 
   when(Saturating) {
     case Event(c@SaturationResponse(dep, succeeded), _) =>
-      goto(Saturating) applying (DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
+      goto(Saturating) applying (DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent) replying SaturatorCmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(c@CreatePartition(partition), _) =>
-      goto(Saturating) applying (PartitionCreatedEvent(partition), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
+      goto(Saturating) applying (PartitionCreatedEvent(partition), SaturationInitializedEvent) replying SaturatorCmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(c@RecreatePartition(partition), _) =>
-      goto(Saturating) applying (PartitionRecreatedEvent(partition), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
+      goto(Saturating) applying (PartitionRecreatedEvent(partition), SaturationInitializedEvent) replying SaturatorCmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(c@RedoDagBranch(partition, vertex), _) =>
-      goto(Saturating) applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
+      goto(Saturating) applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent) replying SaturatorCmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(c@FixPartition(partition), _) =>
-      goto(Saturating) applying (PartitionFixEvent(partition), SaturationInitializedEvent) replying Cmd.Submitted(c, stateName, stateData, getLog)
+      goto(Saturating) applying (PartitionFixEvent(partition), SaturationInitializedEvent) replying SaturatorCmd.Submitted(c, stateName, stateData, getLog)
 
     case Event(GetState, stateData) =>
-      stay() replying Cmd.Submitted(GetState, stateName, stateData, getLog)
+      stay() replying SaturatorCmd.Submitted(GetState, stateName, stateData, getLog)
 
     case Event(ShutDown, _) =>
-      stop() replying Cmd.Submitted(ShutDown, stateName, stateData, getLog)
+      stop() replying SaturatorCmd.Submitted(ShutDown, stateName, stateData, getLog)
   }
 
   onTransition {
@@ -56,11 +56,11 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
       val deps = nextStateData.getNewProgressingDeps
       if (x == DagEmpty) {
         log.info(s"Dag initialized ...")
-        handler ! Cmd.Issued(Initialized, stateName, nextStateData, getLog)
+        handler ! SaturatorCmd.Issued(Initialized, stateName, nextStateData, getLog)
       }
       if (deps.nonEmpty) {
         log.info(s"Saturating ${deps.size} dependencies ...")
-        handler ! Cmd.Issued(Saturate(deps), stateName, nextStateData, getLog)
+        handler ! SaturatorCmd.Issued(Saturate(deps), stateName, nextStateData, getLog)
       }
   }
 
@@ -78,10 +78,10 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
 }
 
 object DagFSM {
-  sealed trait Cmd
-  sealed trait Incoming extends Cmd
-  sealed trait Outgoing extends Cmd
-  sealed trait Internal extends Cmd
+  sealed trait SaturatorCmd
+  sealed trait Incoming extends SaturatorCmd
+  sealed trait Outgoing extends SaturatorCmd
+  sealed trait Internal extends SaturatorCmd
 
   protected[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Internal
 
@@ -99,8 +99,8 @@ object DagFSM {
   protected[saturator] case object DagEmpty extends FSMState { override def identifier: String = "Empty" }
   protected[saturator] case object Saturating extends FSMState { override def identifier: String = "Saturating" }
 
-  object Cmd {
-    sealed trait CmdContainer[T <: Cmd] {
+  object SaturatorCmd {
+    sealed trait CmdContainer[T <: SaturatorCmd] {
       def cmd: T
       def status: FSMState
       def state: DagState

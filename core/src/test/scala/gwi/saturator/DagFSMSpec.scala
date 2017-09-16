@@ -64,11 +64,11 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     )
 
   def handleIssuedCmd(probe: TestProbe, fsmActor: ActorRef, failedDep: Option[Dependency], expectedDepsOpt: Option[Set[Dependency]] = Option.empty): Unit =
-    probe.expectMsgType[Cmd.Issued] match {
-      case Cmd.Issued(Saturate(deps),_,_,_) if expectedDepsOpt.isEmpty || expectedDepsOpt.contains(deps) =>
+    probe.expectMsgType[SaturatorCmd.Issued] match {
+      case SaturatorCmd.Issued(Saturate(deps),_,_,_) if expectedDepsOpt.isEmpty || expectedDepsOpt.contains(deps) =>
         deps.foreach { dep =>
           fsmActor ! SaturationResponse(dep, !failedDep.contains(dep))
-          expectMsgType[Cmd.Submitted]
+          expectMsgType[SaturatorCmd.Submitted]
         }
       case x =>
         sys.error(s"Unexpected message $x")
@@ -80,7 +80,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     val probe = TestProbe()
     val fsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
-    assertResult(Initialized)(probe.expectMsgType[Cmd.Issued].cmd)
+    assertResult(Initialized)(probe.expectMsgType[SaturatorCmd.Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
       handleIssuedCmd(probe, fsmActor, None,
@@ -104,14 +104,14 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     // saturation after adding new partition
 
     fsmActor ! CreatePartition(2L)
-    expectMsgType[Cmd.Submitted]
+    expectMsgType[SaturatorCmd.Submitted]
 
     assertSaturationOfDagForPartition(2L)
 
     // saturation after redoing a dag branch
 
     fsmActor ! RedoDagBranch(2L, Option(2))
-    expectMsgType[Cmd.Submitted]
+    expectMsgType[SaturatorCmd.Submitted]
 
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(1), 2))))
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(3,2), 6))))
@@ -119,14 +119,14 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     // saturation after redoing whole Dag descending from the root vertex
 
     fsmActor ! RedoDagBranch(2L, None)
-    expectMsgType[Cmd.Submitted]
+    expectMsgType[SaturatorCmd.Submitted]
 
     assertSaturationOfDagForPartition(2L)
 
     // saturation after recreating a partition
 
     fsmActor ! RecreatePartition(2L)
-    expectMsgType[Cmd.Submitted]
+    expectMsgType[SaturatorCmd.Submitted]
 
     assertSaturationOfDagForPartition(2L)
 
@@ -134,14 +134,14 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     (3L to 10L) foreach { p =>
       fsmActor ! CreatePartition(p)
-      expectMsgType[Cmd.Submitted]
+      expectMsgType[SaturatorCmd.Submitted]
       assertSaturationOfDagForPartition(p)
     }
 
     // shutdown command
 
     fsmActor ! ShutDown
-    expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
+    expectMsgType[SaturatorCmd.Submitted] match { case (SaturatorCmd.Submitted(cmd, status, state, log)) =>
       assertResult(ShutDown)(cmd)
       assertResult(Saturating)(status)
       assert(state.getVertexStatesByPartition.size == 10)
@@ -153,7 +153,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     val newFsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
 
     newFsmActor ! ShutDown
-    expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
+    expectMsgType[SaturatorCmd.Submitted] match { case (SaturatorCmd.Submitted(cmd, status, state, log)) =>
       assertResult(Saturating)(status)
       assert(state.getVertexStatesByPartition.size == 10)
       assert(state.isSaturated)
@@ -165,7 +165,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     def init: List[(Int, List[Long])] = List(1 -> List(1L))
     val probe = TestProbe()
     val fsmActor = DagFSM(init, probe.ref, "dag-fsm-2")
-    assertResult(Initialized)(probe.expectMsgType[Cmd.Issued].cmd)
+    assertResult(Initialized)(probe.expectMsgType[SaturatorCmd.Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
       handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)),
@@ -184,7 +184,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     assertSaturationOfDagForPartition(1L)
 
     fsmActor ! FixPartition(1L)
-    expectMsgType[Cmd.Submitted]
+    expectMsgType[SaturatorCmd.Submitted]
 
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(1L, Set(1), 2))))
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(1L, Set(3,2), 6))))
@@ -204,7 +204,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
 
     val probe = TestProbe()
     val fsmActor = DagFSM(init, probe.ref, "dag-fsm-3")
-    assertResult(Initialized)(probe.expectMsgType[Cmd.Issued].cmd)
+    assertResult(Initialized)(probe.expectMsgType[SaturatorCmd.Issued].cmd)
 
     handleIssuedCmd(probe, fsmActor, None)
     handleIssuedCmd(probe, fsmActor, None)
@@ -215,7 +215,7 @@ class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSuppo
     handleIssuedCmd(probe, fsmActor, None)
 
     fsmActor ! ShutDown
-    expectMsgType[Cmd.Submitted] match { case (Cmd.Submitted(cmd, status, state, log)) =>
+    expectMsgType[SaturatorCmd.Submitted] match { case (SaturatorCmd.Submitted(cmd, status, state, log)) =>
       assertResult(Saturating)(status)
       assert(state.getVertexStatesByPartition.size == 9)
       assert(state.isSaturated)
