@@ -35,7 +35,7 @@ protected[saturator] object DagState {
   }
 }
 
-protected[saturator] case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends PrintableSupport with LazyLogging {
+case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends PrintableSupport with LazyLogging {
   import Dag._
   import DagState._
   import DagVertex.State._
