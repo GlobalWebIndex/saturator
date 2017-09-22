@@ -6,8 +6,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.math.Ordering
-
-import collection.breakOut
+import collection.{Iterable, breakOut}
 
 protected[saturator] object DagState {
   implicit class TreeMapPimp[A, B](underlying: TreeMap[A, B]) {
@@ -36,7 +35,7 @@ protected[saturator] object DagState {
   }
 }
 
-protected[saturator] case class DagState private(private val vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], private val depsInFlight: Set[Dependency]) extends LazyLogging {
+protected[saturator] case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends PrintableSupport with LazyLogging {
   import Dag._
   import DagState._
   import DagVertex.State._
@@ -65,21 +64,6 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
       s"Illegal inProgressToComplete state of $p from $sourceVertices to $targetVertex:\n${mkString(p).get}"
     )
   }
-
-  def printable(implicit edges: Set[(DagVertex, DagVertex)]): Map[String, DagPartition.State] =
-    vertexStatesByPartition.map { case (p, vertexStates) =>
-      p.pid -> DagPartition.State(mkString(p).get, vertexStates.values)
-    }(breakOut)
-
-  def mkString(p: DagPartition)(implicit edges: Set[(DagVertex, DagVertex)]): Option[String] =
-    vertexStatesByPartition.get(p).map { vertexStates =>
-      val stateByVertex = vertexStates.map { case (v, state) => v.vid -> state }
-      val edgesWithState: List[(String, String)] = edges.map(t => t._1.vid -> t._2.vid).map { case (f,t) => s"$f\n${stateByVertex(f)}" -> s"$t\n${stateByVertex(t)}" }(breakOut)
-      val verticesWithState: Set[String] = stateByVertex.map { case (v, state) => s"$v\n$state"}(breakOut)
-      GraphLayout.renderGraph(Graph(verticesWithState, edgesWithState))
-    }
-
-  def mkString(implicit edges: Set[(DagVertex, DagVertex)]): String = printable.map { case (p,graph) => s"-----------------$p-----------------\n${graph.serializedGraph}"}.mkString("\n","\n","\n")
 
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
   def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
@@ -164,4 +148,36 @@ protected[saturator] case class DagState private(private val vertexStatesByParti
 
   }
 
+}
+
+sealed trait PrintableSupport { this: DagState =>
+  def printable(implicit edges: Set[(DagVertex, DagVertex)]): Map[String, PrintableState] =
+    vertexStatesByPartition.map { case (p, vertexStates) =>
+      p.pid -> PrintableState(mkString(p).get, vertexStates.values)
+    }(breakOut)
+
+  def mkString(p: DagPartition)(implicit edges: Set[(DagVertex, DagVertex)]): Option[String] =
+    vertexStatesByPartition.get(p).map { vertexStates =>
+      val stateByVertex = vertexStates.map { case (v, state) => v.vid -> state }
+      val edgesWithState: List[(String, String)] = edges.map(t => t._1.vid -> t._2.vid).map { case (f,t) => s"$f\n${stateByVertex(f)}" -> s"$t\n${stateByVertex(t)}" }(breakOut)
+      val verticesWithState: Set[String] = stateByVertex.map { case (v, state) => s"$v\n$state"}(breakOut)
+      GraphLayout.renderGraph(Graph(verticesWithState, edgesWithState))
+    }
+
+  def mkString(implicit edges: Set[(DagVertex, DagVertex)]): String = printable.map { case (p,graph) => s"-----------------$p-----------------\n${graph.serializedGraph}"}.mkString("\n","\n","\n")
+}
+
+sealed trait PrintableState {
+  def serializedGraph: String
+}
+
+object PrintableState {
+  case class Progressing(serializedGraph: String) extends PrintableState
+  case class Complete(serializedGraph: String) extends PrintableState
+  case class Failed(serializedGraph: String) extends PrintableState
+  def apply(serializedGraph: String, states: Iterable[String]): PrintableState = states.toSet match {
+    case xs if xs.size == 1 && xs.head == DagVertex.State.Complete => Complete(serializedGraph)
+    case xs if xs.contains(DagVertex.State.Failed) => Failed(serializedGraph)
+    case _ => Progressing(serializedGraph)
+  }
 }

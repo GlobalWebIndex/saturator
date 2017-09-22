@@ -2,10 +2,12 @@ package gwi.saturator
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import gwi.saturator.DagFSM.{SaturatorCmd, CreatePartition, Saturate, SaturationResponse}
+import gwi.saturator.DagFSM.Issued
+import gwi.saturator.DagMock._
+import gwi.saturator.SaturatorCmd._
 import org.backuity.clist._
 import org.backuity.clist.util.Read
-import DagMock._
+
 import scala.concurrent.duration._
 
 object Launcher extends CliMain[Unit] {
@@ -65,7 +67,7 @@ class Example(edges: Set[(DagVertex,DagVertex)], init: => List[(DagVertex, List[
   override def postStop(): Unit = c.cancel()
 
   def receive: Receive = {
-    case SaturatorCmd.Issued(Saturate(deps), _, _, _) =>
+    case Issued(Saturate(deps), _, _, _) =>
       deps.foreach { dep =>
         log.info("Saturating {}", dep)
         dagFSM ! SaturationResponse(dep,true)

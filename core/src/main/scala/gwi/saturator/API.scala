@@ -1,6 +1,5 @@
 package gwi.saturator
 
-import scala.collection.Iterable
 import scala.math.Ordering
 
 trait DagPartition {
@@ -11,24 +10,8 @@ trait DagVertex {
   def vid: String
 }
 
-object DagPartition {
-  sealed trait State {
-    def serializedGraph: String
-  }
-  case class Progressing(serializedGraph: String) extends State
-  case class Complete(serializedGraph: String) extends State
-  case class Failed(serializedGraph: String) extends State
-  object State {
-    def apply(serializedGraph: String, states: Iterable[String]): State = states.toSet match {
-      case xs if xs.size == 1 && xs.head == DagVertex.State.Complete => Complete(serializedGraph)
-      case xs if xs.contains(DagVertex.State.Failed) => Failed(serializedGraph)
-      case _ => Progressing(serializedGraph)
-    }
-  }
-}
-
 object DagVertex {
-  protected[saturator] object State {
+  object State {
     val Pending = "Pending"
     val Complete = "Complete"
     val InProgress = "InProgress"
@@ -52,4 +35,24 @@ object Dependency {
     }
   }
 
+}
+
+sealed trait SaturatorCmd
+object SaturatorCmd {
+  sealed trait Incoming extends SaturatorCmd
+  sealed trait Outgoing extends SaturatorCmd
+  private[saturator] sealed trait Internal extends SaturatorCmd
+
+  case class Saturate(dep: Set[Dependency]) extends Outgoing
+  case object Saturated extends Outgoing
+  case object Initialized extends Outgoing
+  private[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Internal
+
+  case class CreatePartition(p: DagPartition) extends Incoming
+  case class RecreatePartition(p: DagPartition) extends Incoming
+  case class RedoDagBranch(p: DagPartition, v: Option[DagVertex]) extends Incoming
+  case class FixPartition(p: DagPartition) extends Incoming
+  case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Incoming
+  case object GetState extends Incoming
+  case object ShutDown extends Incoming
 }
