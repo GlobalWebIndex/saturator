@@ -16,7 +16,7 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
   import SaturatorCmd._
 
   override def logDepth = 100
-  override def persistenceId: String = self.path.name
+  override def persistenceId: String = self.path.toStringWithoutAddress
   override def domainEventClassTag: ClassTag[DagStateEvent] = scala.reflect.classTag[DagStateEvent]
 
   startWith(DagEmpty, DagState.empty)
