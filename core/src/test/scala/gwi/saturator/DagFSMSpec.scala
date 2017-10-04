@@ -6,7 +6,6 @@ import com.typesafe.config.ConfigFactory
 import gwi.saturator.DagFSM._
 import gwi.saturator.SaturatorCmd._
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpecLike, Matchers}
-import redis.RedisClient
 
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
@@ -19,37 +18,43 @@ object DagFSMSpec {
           log-dead-letters-during-shutdown = off
           actor.warn-about-java-serializer-usage = off
           extensions = ["com.romix.akka.serialization.kryo.KryoSerializationExtension$"]
-          akka-persistence-redis.journal.class = "com.hootsuite.akka.persistence.redis.journal.RedisJournal"
-          persistence.journal.plugin = "akka-persistence-redis.journal"
+          persistence.journal.plugin = "my-dynamodb-journal"
         }
-        redis {
-          host = localhost
-          port = 6379
-          password = foo
-          sentinel = false
+        my-dynamodb-journal = ${dynamodb-journal}
+        my-dynamodb-journal {
+          endpoint =  "http://localhost:8000"
         }
         """.stripMargin
-  ).withFallback(ConfigFactory.load())
+  ).withFallback(ConfigFactory.load()).resolve()
+
+  val dynamoInit =
+    """
+      aws \
+       --endpoint-url=http://localhost:8000 dynamodb create-table \
+       --table-name akka-persistence \
+       --attribute-definitions \
+           AttributeName=par,AttributeType=S \
+           AttributeName=num,AttributeType=N \
+       --key-schema AttributeName=par,KeyType=HASH AttributeName=num,KeyType=RANGE \
+       --provisioned-throughput ReadCapacityUnits=10000,WriteCapacityUnits=10000
+    """.stripMargin
 }
 
 class DagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with BeforeAndAfterEach with ImplicitSender {
   import DagMock._
   def this() = this(ActorSystem("DagFSMSpec", DagFSMSpec.config))
 
-  private[this] var redisClient: RedisClient = null
-
   override def beforeAll(): Unit = try super.beforeAll() finally {
-    startContainer("redis", "redis-test", 6379)(())
+    startContainer("dwmkerr/dynamodb", "dynamo-test", Seq(PPorts.from(8000,8000)), Some("-sharedDb")) {
+      startContainer("garland/aws-cli-docker", "dynamo-init", Seq.empty, Some(DagFSMSpec.dynamoInit))(())
+    }
     Thread.sleep(1000)
-    redisClient = RedisClient("localhost", 6379, name = "test-redis-client")
   }
 
-  override def afterEach(): Unit = try {
-    Await.ready(redisClient.flushall(), 2.seconds)
-  } finally super.afterAll()
-
   override def afterAll(): Unit = try {
-    stopContainer("redis-test")(())
+    stopContainer("dynamo-test") {
+      stopContainer("dynamo-init")(())
+    }
     Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf)
   } finally super.afterAll()
 

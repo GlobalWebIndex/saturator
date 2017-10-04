@@ -5,10 +5,18 @@ import scala.util.Try
 
 trait DockerSupport {
 
+  case class PPorts(host: String, guest: String)
+  object PPorts {
+    def from(host: Int, guest: Int) = new PPorts(host.toString, guest.toString)
+  }
+
   private def docker(cmd: String) = Array("/bin/sh", "-c", s"docker $cmd")
 
-  protected def startContainer(image: String, name: String, port: Int)(prepare: => Unit): Unit = {
-    require(Process(docker(s"run --name $name -p $port:$port -d $image")).run().exitValue == 0)
+  private def portsToString(ports: Seq[PPorts]) =
+    if (ports.isEmpty) "" else ports.map { case PPorts(host, guest) => s"$host:$guest" }.mkString("-p ", " -p ", "")
+
+  protected def startContainer(image: String, name: String, ports: Seq[PPorts], cmd: Option[String])(prepare: => Unit): Unit = {
+    require(Process(docker(s"run --name $name ${portsToString(ports)} -d $image ${cmd.getOrElse("")}")).run(true).exitValue == 0)
     Thread.sleep(500)
     prepare
   }

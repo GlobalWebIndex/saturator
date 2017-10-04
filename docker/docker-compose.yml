@@ -1,13 +1,34 @@
 version: '2'
 services:
 
-    redis:
-        image: redis
+    dynamo:
+        image: dwmkerr/dynamodb
         ports:
-            - 6379:6379
+            - 8000:8000
+        command: -sharedDb
+
+    dynamo-init:
+        image: garland/aws-cli-docker
+        environment:
+            - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            - AWS_DEFAULT_REGION=eu-west-1
+        depends_on:
+            - dynamo
+        command: aws
+                  --endpoint-url=http://dynamo:8000 dynamodb create-table
+                  --table-name akka-persistence
+                  --attribute-definitions
+                      AttributeName=par,AttributeType=S
+                      AttributeName=num,AttributeType=N
+                  --key-schema AttributeName=par,KeyType=HASH AttributeName=num,KeyType=RANGE
+                  --provisioned-throughput ReadCapacityUnits=1000,WriteCapacityUnits=1000
 
     saturator:
         image: gwiq/saturator-example:latest
+        environment:
+            - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         depends_on:
-            - redis
+            - dynamo-init
         command: --edges=a-b,a-c,a-d,a-e,b-f,c-f,d-g --existing-head-partitions=1,2,3,4 --new-partition-interval=3

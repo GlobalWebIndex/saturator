@@ -29,20 +29,17 @@ object Launcher extends CliMain[Unit] {
           log-dead-letters-during-shutdown = off
           actor.warn-about-java-serializer-usage = off
           extensions = ["com.romix.akka.serialization.kryo.KryoSerializationExtension$"]
-          akka-persistence-redis.journal.class = "com.hootsuite.akka.persistence.redis.journal.RedisJournal"
-          persistence.journal.plugin = "akka-persistence-redis.journal"
+          persistence.journal.plugin = "my-dynamodb-journal"
         }
-        redis {
-          host = localhost
-          port = 6379
-          password = foo
-          sentinel = false
+        my-dynamodb-journal = ${dynamodb-journal}
+        my-dynamodb-journal {
+          endpoint =  "http://dynamo:8000"
         }
         """.stripMargin
-  ).withFallback(ConfigFactory.load())
+  ).withFallback(ConfigFactory.load()).resolve()
 
   override def run: Unit = {
-    val system = ActorSystem("example", config.withValue("redis.host", ConfigValueFactory.fromAnyRef("redis")))
+    val system = ActorSystem("example", config)
 
     val vertices = edges.flatMap(t => Set(t._1, t._2)).toSet
     val headVertex = edges.head._1

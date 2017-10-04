@@ -1,5 +1,5 @@
 
-version in ThisBuild := "0.1.6"
+version in ThisBuild := "0.1.7"
 crossScalaVersions in ThisBuild := Seq("2.12.3", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
@@ -17,7 +17,7 @@ lazy val `saturator-api` = (project in file("api"))
 lazy val `saturator-core` = (project in file("core"))
   .enablePlugins(CommonPlugin)
   .settings(name := "saturator-core")
-  .settings(libraryDependencies ++= Seq(asciiGraphs, akkaActor, akkaPersistence, akkaPersistenceRedis, akkaKryoSerialization, akkaTestkit, scalatest, loggingImplLog4j % "test"))
+  .settings(libraryDependencies ++= Seq(asciiGraphs, akkaActor, akkaPersistence, akkaPersistenceDynamoDB, akkaKryoSerialization, akkaTestkit, scalatest, loggingImplLog4j % "test"))
   .settings(publishSettings("GlobalWebIndex", "saturator-core", s3Resolver))
   .dependsOn(`saturator-api` % "compile->compile;test->test")
 

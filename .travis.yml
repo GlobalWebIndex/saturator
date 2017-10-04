@@ -5,7 +5,7 @@ services:
   - docker
 language: scala
 scala:
-    - 2.12.1
+    - 2.12.3
 jdk:
     - oraclejdk8
 cache:
@@ -21,7 +21,8 @@ notifications:
     recipients:
       - liska.jakub@gmail.com
 before_install:
-    - docker pull redis
+    - docker pull dwmkerr/dynamodb
+    - docker pull garland/aws-cli-docker
 before_script:
     - rm -rf ${HOME}/.sbt/0.13/staging
 script:
