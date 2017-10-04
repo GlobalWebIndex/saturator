@@ -54,9 +54,10 @@ or
 dependsOn(ProjectRef(uri("https://github.com/GlobalWebIndex/saturator.git#vx.y.x"), "saturator-core"))
 ```
 
-See demo at `example/`. Akka persistence uses redis plugin as it is the best fit for saturator unless DAG gets really complex or
-it has a lot of partitions in which case something like Cassandra would be a better fit.
-It uses Kryo serialization because event log is persisted only temporarily and it would be deleted on new deploy.
+Note that this library is tested on [akka-persistence-dynamodb](https://github.com/akka/akka-persistence-dynamodb) plugin, but running it on
+different plugin like akka-persistence-redis is just a matter of configuration changes.
+
+See demo at `example/` :
 
 ```
 $ cd docker
