@@ -54,14 +54,17 @@ or
 dependsOn(ProjectRef(uri("https://github.com/GlobalWebIndex/saturator.git#vx.y.x"), "saturator-core"))
 ```
 
-Note that this library is tested on [akka-persistence-dynamodb](https://github.com/akka/akka-persistence-dynamodb) plugin, but running it on
-different plugin like akka-persistence-redis is just a matter of configuration changes.
+Note that this library is tested on :
+ - [akka-persistence-dynamodb](https://github.com/akka/akka-persistence-dynamodb)
+ - [akka-persistence-redis](https://github.com/safety-data/akka-persistence-redis)
+
+But can run on different plugin like akka-persistence-cassandra, it is just a matter of how high your throughput is.
 
 See demo at `example/` :
 
 ```
 $ cd docker
-$ docker-compose up
+$ docker-compose -f saturator-$plugin.yml up
 
 ```
 

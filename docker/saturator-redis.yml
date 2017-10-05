@@ -1,0 +1,13 @@
+version: '2'
+services:
+
+    redis:
+        image: redis
+        ports:
+            - 6379:6379
+
+    saturator:
+        image: gwiq/saturator-example:latest
+        depends_on:
+            - redis
+        command: --edges=a-b,a-c,a-d,a-e,b-f,c-f,d-g --existing-head-partitions=1,2,3,4 --new-partition-interval=3 --persistence-plugin=redis

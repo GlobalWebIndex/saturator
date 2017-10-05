@@ -1,7 +1,7 @@
 package gwi.saturator
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{ConfigFactory}
 import gwi.saturator.DagFSM.Issued
 import gwi.saturator.DagMock._
 import gwi.saturator.SaturatorCmd._
@@ -19,27 +19,13 @@ object Launcher extends CliMain[Unit] {
   private implicit def edgesRead: Read[List[(DagVertex, DagVertex)]] =
     Read.reads("edges")(_.split(",").filter(_.nonEmpty).map(_.split("-")).map(arr => VertexMock(arr(0)) -> VertexMock(arr(1))).toList)
 
-  var edges = arg[List[(DagVertex,DagVertex)]]()
-  var existingHeadPartitions = arg[List[Int]](name = "existing-head-partitions")
-  var newPartitionInterval = arg[Int](name = "new-partition-interval")
-
-  private val config = ConfigFactory.parseString(
-    """
-        akka {
-          log-dead-letters-during-shutdown = off
-          actor.warn-about-java-serializer-usage = off
-          extensions = ["com.romix.akka.serialization.kryo.KryoSerializationExtension$"]
-          persistence.journal.plugin = "my-dynamodb-journal"
-        }
-        my-dynamodb-journal = ${dynamodb-journal}
-        my-dynamodb-journal {
-          endpoint =  "http://dynamo:8000"
-        }
-        """.stripMargin
-  ).withFallback(ConfigFactory.load()).resolve()
+  var edges                   = arg[List[(DagVertex,DagVertex)]]()
+  var existingHeadPartitions  = arg[List[Int]](name = "existing-head-partitions")
+  var newPartitionInterval    = arg[Int](name = "new-partition-interval")
+  var persistencePlugin       = arg[String](name = "persistence-plugin")
 
   override def run: Unit = {
-    val system = ActorSystem("example", config)
+    val system = ActorSystem("example", ConfigFactory.load(persistencePlugin).withFallback(ConfigFactory.parseResources("reference.conf")).resolve())
 
     val vertices = edges.flatMap(t => Set(t._1, t._2)).toSet
     val headVertex = edges.head._1
