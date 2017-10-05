@@ -22,13 +22,12 @@ lazy val `saturator-core` = (project in file("core"))
     libraryDependencies ++= Seq(
       asciiGraphs, akkaActor, akkaPersistence, akkaKryoSerialization, akkaTestkit, scalatest, akkaPersistenceDynamoDB % "test", akkaPersistenceRedis % "test", loggingImplLog4j % "test"
     )
-  )
-  .dependsOn(`saturator-api` % "compile->compile;test->test")
+  ).dependsOn(`saturator-api` % "compile->compile;test->test")
 
 lazy val `saturator-example` = (project in file("example"))
   .enablePlugins(CommonPlugin, DockerPlugin)
   .settings(name := "saturator-example")
-  .settings(libraryDependencies ++= Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLog4j) ++ clist)
+  .settings(libraryDependencies ++= Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLog4j))
   .settings(assemblySettings("saturator-example", Some("gwi.saturator.Launcher")))
   .settings(deploySettings("java:8", "gwiq", "saturator-example", "gwi.saturator.Launcher"))
   .dependsOn(`saturator-core` % "compile->compile;test->test")
