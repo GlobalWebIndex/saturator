@@ -7,6 +7,8 @@ fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi
 
 lazy val saturator = (project in file("."))
+  .settings(aggregate in update := false)
+  .settings(publish := { })
   .aggregate(`saturator-api`, `saturator-core`, `saturator-example`)
 
 lazy val `saturator-api` = (project in file("api"))
@@ -29,5 +31,5 @@ lazy val `saturator-example` = (project in file("example"))
   .settings(name := "saturator-example")
   .settings(libraryDependencies ++= Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLog4j))
   .settings(assemblySettings("saturator-example", Some("gwi.saturator.Launcher")))
-  .settings(deploySettings("java:8", "gwiq", "saturator-example", "gwi.saturator.Launcher"))
+  .settings(deploySettings("openjdk:8", "gwiq", "saturator-example", "gwi.saturator.Launcher"))
   .dependsOn(`saturator-core` % "compile->compile;test->test")
