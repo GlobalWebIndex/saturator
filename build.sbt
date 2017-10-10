@@ -13,12 +13,10 @@ lazy val saturator = (project in file("."))
 
 lazy val `saturator-api` = (project in file("api"))
   .enablePlugins(CommonPlugin)
-  .settings(name := "saturator-api")
   .settings(publishSettings("GlobalWebIndex", "saturator-api", s3Resolver))
 
 lazy val `saturator-core` = (project in file("core"))
   .enablePlugins(CommonPlugin)
-  .settings(name := "saturator-core")
   .settings(publishSettings("GlobalWebIndex", "saturator-core", s3Resolver))
   .settings(
     libraryDependencies ++= Seq(
@@ -28,7 +26,7 @@ lazy val `saturator-core` = (project in file("core"))
 
 lazy val `saturator-example` = (project in file("example"))
   .enablePlugins(CommonPlugin, DockerPlugin)
-  .settings(name := "saturator-example")
+  .settings(publish := { })
   .settings(libraryDependencies ++= Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLog4j))
   .settings(assemblySettings("saturator-example", Some("gwi.saturator.Launcher")))
   .settings(deploySettings("openjdk:8", "gwiq", "saturator-example", "gwi.saturator.Launcher"))
