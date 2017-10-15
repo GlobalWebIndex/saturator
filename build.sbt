@@ -1,5 +1,5 @@
 
-version in ThisBuild := "0.1.8"
+version in ThisBuild := "0.1.9"
 crossScalaVersions in ThisBuild := Seq("2.12.3", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
@@ -27,5 +27,5 @@ lazy val `saturator-example` = (project in file("example"))
   .enablePlugins(CommonPlugin, DockerPlugin)
   .settings(publish := { })
   .settings(libraryDependencies ++= clist ++ Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLog4j))
-  .settings(deploy("openjdk:8", "gwiq", "saturator-example", "gwi.saturator.Launcher"))
+  .settings(deploy("openjdk:8", "gwiq", "saturator-example", "gwi.saturator.Launcher", Seq.empty))
   .dependsOn(`saturator-core` % "compile->compile;test->test")
