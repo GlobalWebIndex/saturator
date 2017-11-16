@@ -71,6 +71,7 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
     )
   }
 
+  def getRoot(implicit edges: Set[(DagVertex, DagVertex)]): DagVertex = Dag.root(edges)
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
   def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
     vertexStates(root(edges)) == Complete && descendantsOfRoot[DagVertex](edges, v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
