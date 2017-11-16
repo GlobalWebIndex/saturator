@@ -33,9 +33,6 @@ class DagFSM(init: () => List[(DagVertex, List[DagPartition])], handler: ActorRe
     case Event(c@CreatePartition(partition), _) =>
       goto(Saturating) applying (PartitionCreatedEvent(partition), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
 
-    case Event(c@RecreatePartition(partition), _) =>
-      goto(Saturating) applying (PartitionRecreatedEvent(partition), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
-
     case Event(c@RedoDagBranch(partition, vertex), _) =>
       goto(Saturating) applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
 

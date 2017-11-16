@@ -9,8 +9,15 @@ import scala.math.Ordering
 import collection.{Iterable, breakOut}
 
 protected[saturator] object DagState {
-  implicit class TreeMapPimp[A, B](underlying: TreeMap[A, B]) {
-    def adjust(k: A)(f: B => B) = underlying.updated(k, f(underlying(k)))
+  implicit class TreeMapPimp[K, V](underlying: TreeMap[K, V]) {
+    def adjust(k: K)(f: V => V): TreeMap[K, V] = underlying.updated(k, f(underlying(k)))
+    def adjustOpt(k: K)(f: Option[V] => V): TreeMap[K, V] = underlying updated(k, f(underlying.get(k)))
+    def adjustFlatOpt(k: K)(f: Option[V] => Option[V]): TreeMap[K, V] = f(underlying.get(k)) match {
+      case None =>
+        underlying
+      case Some(v) =>
+        underlying updated(k, v)
+    }
   }
 
   protected[saturator] def empty(implicit po: Ordering[DagPartition]): DagState =
@@ -26,9 +33,8 @@ protected[saturator] object DagState {
   protected[saturator] case class PartitionCreatedEvent(p: DagPartition) extends DagStateEvent
 
   sealed trait AdhocEvent extends DagStateEvent
-  protected[saturator] case class DagBranchRedoEvent(p: DagPartition, vertex: Option[DagVertex]) extends AdhocEvent
+  protected[saturator] case class DagBranchRedoEvent(p: DagPartition, vertex: DagVertex) extends AdhocEvent
   protected[saturator] case class PartitionFixEvent(p: DagPartition) extends AdhocEvent
-  protected[saturator] case class PartitionRecreatedEvent(p: DagPartition) extends AdhocEvent
 
   object DagStateEvent {
     protected[saturator] def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
@@ -118,14 +124,26 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       val partitionStateByVertex = allVertices(edges).map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
       copy(vertexStatesByPartition = vertexStatesByPartition + (p -> partitionStateByVertex))
 
-    case DagBranchRedoEvent(p, vertexOpt) =>
-      val vertex = vertexOpt.getOrElse(Dag.root(edges))
-      val partitionStateByVertex = vertexStatesByPartition(p)
-      val toBePendingVertices = descendantsOf(vertex, edges) ++ vertexOpt
-      require(partitionStateByVertex(vertex) == Complete, s"Dag branch cannot be redone at $p in vertex where it is not Complete :\n${mkString(p).get}")
-      require(ancestorsOf(vertex, edges).map(partitionStateByVertex).forall(_ == Complete), s"Completed $vertex in $p must have Complete ancestors :\n${mkString(p).get}")
-      require(toBePendingVertices.map(partitionStateByVertex).forall(_ == Complete), s"Completed $vertex in $p must have Complete descendants :\n${mkString(p).get}")
-      val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
+    case DagBranchRedoEvent(p, vertex) =>
+      val newVertexStatesByPartition =
+        vertexStatesByPartition.adjustFlatOpt(p) {
+          case None =>
+            logger.error(s"Redoing $vertex of partition $p that doesn't exist !!!")
+            None
+          case Some(partitionStateByVertex) =>
+            val branch = descendantsOf(vertex, edges) ++ Option(vertex).filter(_ != Dag.root(edges))
+            val branchStates = branch.map(partitionStateByVertex)
+            val ancestorStates = ancestorsOf(vertex, edges).map(partitionStateByVertex)
+            if (branchStates.contains(InProgress)) {
+              logger.warn(s"Redoing dag branch of $vertex with progressing partition $p is not allowed :\n${mkString(p).get}")
+              None
+            } else if (!ancestorStates.forall(_ == Complete)){
+              logger.warn(s"Dag branch cannot be redone at $p in vertex $vertex from incomplete ancestors :\n${mkString(p).get}")
+              None
+            } else
+              Some(partitionStateByVertex ++ branch.map(_ -> Pending))
+        }
+      val newState = copy(vertexStatesByPartition = newVertexStatesByPartition)
       logger.info(s"Dag branch from $vertex of partition $p is to be redone :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
       newState
 
@@ -138,13 +156,6 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
       logger.info(s"Partition $p is to be fixed :\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
       newState
-
-    case PartitionRecreatedEvent(p) =>
-      val rootVertex = Dag.root(edges)
-      val partitionStateByVertex = vertexStatesByPartition.getOrElse(p, throw new IllegalStateException(s"Recreating partition $p that doesn't exist !!!"))
-      require(!descendantsOf(rootVertex, edges).map(partitionStateByVertex).contains(InProgress), s"Recreating progressing partition $p is not allowed :\n${mkString(p).get}")
-      val newPartitionStateByVertex = allVertices(edges).map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
-      copy(vertexStatesByPartition = vertexStatesByPartition + (p -> newPartitionStateByVertex))
 
   }
 

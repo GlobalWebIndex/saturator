@@ -74,7 +74,7 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
 
     // saturation after redoing a dag branch
 
-    fsmActor ! RedoDagBranch(2L, Option(2))
+    fsmActor ! RedoDagBranch(2L, 2)
     expectMsgType[Submitted]
 
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(1), 2))))
@@ -83,14 +83,14 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
 
     // saturation after redoing whole Dag descending from the root vertex
 
-    fsmActor ! RedoDagBranch(2L, None)
+    fsmActor ! RedoDagBranch(2L, 1)
     expectMsgType[Submitted]
 
     assertSaturationOfDagForPartition(2L)
 
     // saturation after recreating a partition
 
-    fsmActor ! RecreatePartition(2L)
+    fsmActor ! RedoDagBranch(2L, 1)
     expectMsgType[Submitted]
 
     assertSaturationOfDagForPartition(2L)

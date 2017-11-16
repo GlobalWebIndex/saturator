@@ -49,8 +49,7 @@ object SaturatorCmd {
   private[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Internal
 
   case class CreatePartition(p: DagPartition) extends Incoming
-  case class RecreatePartition(p: DagPartition) extends Incoming
-  case class RedoDagBranch(p: DagPartition, v: Option[DagVertex]) extends Incoming
+  case class RedoDagBranch(p: DagPartition, vertex: DagVertex) extends Incoming
   case class FixPartition(p: DagPartition) extends Incoming
   case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Incoming
   case object GetState extends Incoming
