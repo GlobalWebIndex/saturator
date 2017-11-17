@@ -27,7 +27,7 @@ class DagFSM(
 
   private[this] def schedulePartitionCheck(currentState: DagState): Unit =
     partitionChangesSchedule.foreach { case PartitionChangesSchedule(interval, delay) =>
-      log.info(s"Scheduling partition changes check in $delay every $interval ...")
+      log.info(s"Scheduling partition changes check ...")
       context.system.scheduler.schedule(interval, delay, handler, Issued(GetPartitionChanges(Dag.root(edges)), stateName, currentState, getLog))(Implicits.global, self)
     }
 
@@ -35,7 +35,7 @@ class DagFSM(
 
   when(DagEmpty) {
     case Event(Initialize(partitionsByVertex), _) =>
-      goto(Saturating) applying (StateInitializedEvent(partitionsByVertex), SaturationInitializedEvent) andThen schedulePartitionCheck
+      goto(Saturating) applying (StateInitializedEvent(partitionsByVertex), SaturationInitializedEvent)
   }
 
   when(Saturating) {
@@ -63,9 +63,13 @@ class DagFSM(
 
   onTransition {
     case DagEmpty -> DagEmpty if nextStateData.getVertexStatesByPartition.isEmpty => // Initialization happens only on fresh start, not when persistent event log is replayed
-      log.info("DAG created, initializing ...")
+      log.info("Starting FSM, DAG created, initializing ...")
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
       self ! Initialize(initialData)
+      schedulePartitionCheck(nextStateData)
+    case DagEmpty -> DagEmpty =>
+      log.info("Starting FSM, DAG already exists ...")
+      schedulePartitionCheck(nextStateData)
     case x -> Saturating =>
       if (x == DagEmpty) {
         log.info(s"Dag initialized ...")

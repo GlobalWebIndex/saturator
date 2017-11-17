@@ -44,8 +44,9 @@ class Example(edges: Set[(DagVertex,DagVertex)], init: => List[(DagVertex, List[
   private[this] val dagFSM = DagFSM(init, self, Some(PartitionChangesSchedule(interval, interval)), "example-dag-fsm")
 
   def receive: Receive = {
-    case GetPartitionChanges(_) =>
+    case Issued(GetPartitionChanges(_),_,_,_) =>
       dagFSM ! PartitionInserts(TreeSet(PartitionMock(partitionCounter.toString)))
+      log.info(s"New partition created ${partitionCounter.toString} ...")
       partitionCounter+=1
     case Issued(Saturate(deps), _, _, _) =>
       deps.foreach { dep =>
