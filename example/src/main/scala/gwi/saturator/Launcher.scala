@@ -1,13 +1,14 @@
 package gwi.saturator
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-import com.typesafe.config.{ConfigFactory}
-import gwi.saturator.DagFSM.Issued
+import com.typesafe.config.ConfigFactory
+import gwi.saturator.DagFSM.{Issued, PartitionChangesSchedule}
 import gwi.saturator.DagMock._
 import gwi.saturator.SaturatorCmd._
 import org.backuity.clist._
 import org.backuity.clist.util.Read
 
+import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
 
 object Launcher extends CliMain[Unit] {
@@ -38,18 +39,14 @@ object Launcher extends CliMain[Unit] {
 }
 
 class Example(edges: Set[(DagVertex,DagVertex)], init: => List[(DagVertex, List[DagPartition])], interval: FiniteDuration, lastPartition: Int) extends Actor with ActorLogging {
-  import context.dispatcher
   private[this] var partitionCounter = lastPartition + 1
   private[this] implicit val e = edges
-  private[this] val dagFSM = DagFSM(init, self, "example-dag-fsm")
-  private[this] val c = context.system.scheduler.schedule(interval, interval) {
-    dagFSM ! CreatePartition(PartitionMock(partitionCounter.toString))
-    partitionCounter+=1
-  }
-
-  override def postStop(): Unit = c.cancel()
+  private[this] val dagFSM = DagFSM(init, self, Some(PartitionChangesSchedule(interval, interval)), "example-dag-fsm")
 
   def receive: Receive = {
+    case GetPartitionChanges(_) =>
+      dagFSM ! PartitionInserts(TreeSet(PartitionMock(partitionCounter.toString)))
+      partitionCounter+=1
     case Issued(Saturate(deps), _, _, _) =>
       deps.foreach { dep =>
         log.info("Saturating {}", dep)

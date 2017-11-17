@@ -42,7 +42,7 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     def init: List[(Int, List[Long])] = List(1 -> List(1L))
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
+    val fsmActor = DagFSM(init, probe.ref, None, "test-dag-fsm")
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
@@ -67,7 +67,14 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
 
     // saturation after adding new partition
 
-    fsmActor ! CreatePartition(2L)
+    fsmActor ! PartitionInserts(TreeSet(2L))
+    expectMsgType[Submitted]
+
+    assertSaturationOfDagForPartition(2L)
+
+    // saturation after changing existing partition
+
+    fsmActor ! PartitionUpdates(TreeSet(2L))
     expectMsgType[Submitted]
 
     assertSaturationOfDagForPartition(2L)
@@ -81,13 +88,6 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(3,2), 6))))
     assertResult(Saturated)(probe.expectMsgType[Issued].cmd)
 
-    // saturation after redoing whole Dag descending from the root vertex
-
-    fsmActor ! RedoDagBranch(2L, 1)
-    expectMsgType[Submitted]
-
-    assertSaturationOfDagForPartition(2L)
-
     // saturation after recreating a partition
 
     fsmActor ! RedoDagBranch(2L, 1)
@@ -98,7 +98,7 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     // commands queuing
 
     (3L to 10L) foreach { p =>
-      fsmActor ! CreatePartition(p)
+      fsmActor ! PartitionInserts(TreeSet(p))
       expectMsgType[Submitted]
       assertSaturationOfDagForPartition(p)
     }
@@ -115,7 +115,7 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
 
     // persistent state replaying
     Thread.sleep(300)
-    val newFsmActor = DagFSM(init, probe.ref, "test-dag-fsm")
+    val newFsmActor = DagFSM(init, probe.ref, None, "test-dag-fsm")
 
     newFsmActor ! ShutDown
     expectMsgType[Submitted] match { case (Submitted(cmd, status, state, log)) =>
@@ -129,7 +129,7 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
   "testing partition fixing" in {
     def init: List[(Int, List[Long])] = List(1 -> List(1L))
     val probe = TestProbe()
-    val fsmActor = DagFSM(init, probe.ref, "dag-fsm-2")
+    val fsmActor = DagFSM(init, probe.ref, None, "dag-fsm-2")
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
@@ -169,7 +169,7 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
       )
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(init, probe.ref, "dag-fsm-3")
+    val fsmActor = DagFSM(init, probe.ref, None, "dag-fsm-3")
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     handleIssuedCmd(probe, fsmActor, None)

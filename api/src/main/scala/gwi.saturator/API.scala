@@ -1,5 +1,6 @@
 package gwi.saturator
 
+import scala.collection.immutable.TreeSet
 import scala.math.Ordering
 
 trait DagPartition {
@@ -44,14 +45,17 @@ object SaturatorCmd {
   private[saturator] sealed trait Internal extends SaturatorCmd
 
   case class Saturate(dep: Set[Dependency]) extends Outgoing
+  case class GetPartitionChanges(rootVertex: DagVertex) extends Outgoing
   case object Saturated extends Outgoing
   case object Initialized extends Outgoing
   private[saturator] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends Internal
 
-  case class CreatePartition(p: DagPartition) extends Incoming
   case class RedoDagBranch(p: DagPartition, vertex: DagVertex) extends Incoming
   case class FixPartition(p: DagPartition) extends Incoming
   case class SaturationResponse(dep: Dependency, succeeded: Boolean) extends Incoming
   case object GetState extends Incoming
   case object ShutDown extends Incoming
+
+  case class PartitionInserts(partitions: TreeSet[DagPartition]) extends Incoming
+  case class PartitionUpdates(partitions: TreeSet[DagPartition]) extends Incoming
 }
