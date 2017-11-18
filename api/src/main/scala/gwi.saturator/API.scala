@@ -1,15 +1,11 @@
 package gwi.saturator
 
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.math.Ordering
 
-trait DagPartition {
-  def pid: String
-}
+case class DagPartition(pid: String)
 
-trait DagVertex {
-  def vid: String
-}
+case class DagVertex(vid: String)
 
 object DagVertex {
   object State {
@@ -19,7 +15,7 @@ object DagVertex {
     val Failed = "Failed"
   }
 }
-case class Dependency(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex)
+case class Dependency(p: DagPartition, sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex)
 
 object Dependency {
   implicit def dependencyOrdering(implicit po: Ordering[DagPartition], vo: Ordering[DagVertex]) = new Ordering[Dependency] {
@@ -44,7 +40,7 @@ object SaturatorCmd {
   sealed trait Outgoing extends SaturatorCmd
   private[saturator] sealed trait Internal extends SaturatorCmd
 
-  case class Saturate(dep: Set[Dependency]) extends Outgoing
+  case class Saturate(dep: Dependency) extends Outgoing
   case class GetPartitionChanges(rootVertex: DagVertex) extends Outgoing
   case object Saturated extends Outgoing
   case object Initialized extends Outgoing
