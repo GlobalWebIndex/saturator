@@ -25,10 +25,12 @@ class DagFSM(
   override def persistenceId: String = self.path.toStringWithoutAddress
   override def domainEventClassTag: ClassTag[DagStateEvent] = scala.reflect.classTag[DagStateEvent]
 
+  log.info(s"Starting DagFSM with persistence id $persistenceId ...")
+
   private[this] def schedulePartitionCheck(currentState: DagState): Unit =
     partitionChangesSchedule.foreach { case PartitionChangesSchedule(interval, delay) =>
       log.info(s"Scheduling partition changes check ...")
-      context.system.scheduler.schedule(interval, delay, handler, Issued(GetPartitionChanges(Dag.root(edges)), stateName, currentState, getLog))(Implicits.global, self)
+      context.system.scheduler.schedule(interval, delay, handler, Issued(GetPartitionChanges(currentState.getRoot), stateName, currentState, getLog))(Implicits.global, self)
     }
 
   startWith(DagEmpty, DagState.empty)
@@ -78,7 +80,7 @@ class DagFSM(
       val deps = nextStateData.getNewProgressingDeps
       if (deps.nonEmpty) {
         log.info(s"Saturating ${deps.size} dependencies ...")
-        handler ! Issued(Saturate(deps), stateName, nextStateData, getLog)
+        deps.foreach( dep => handler ! Issued(Saturate(dep), stateName, nextStateData, getLog) )
       } else if (nextStateData.isSaturated) {
         log.info(s"Dag is fully saturated ...")
         handler ! Issued(Saturated, stateName, nextStateData, getLog)
@@ -93,7 +95,7 @@ class DagFSM(
 
   def applyEvent(event: DagStateEvent, dagState: DagState): DagState = event match {
     case e =>
-      dagState.updated(e)(edges,po,vo)
+      dagState.updated(e)
   }
 
 }
