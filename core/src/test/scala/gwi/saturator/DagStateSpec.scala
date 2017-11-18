@@ -6,18 +6,14 @@ import org.scalatest.concurrent.ScalaFutures
 
 import scala.collection.immutable.{TreeMap, TreeSet}
 
-class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
-  import DagMock._
+class DagStateSpec extends FreeSpec with DagTestSupport with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
   import DagVertex.State._
   private[this] implicit val edges: Set[(DagVertex, DagVertex)] =
     Set(
-      1 -> 2,
-      1 -> 3,
-      1 -> 4,
-      1 -> 5,
-      2 -> 6,
-      3 -> 6,
-      4 -> 7
+      1 -> 2, 2 -> 6,
+      1 -> 3, 3 -> 6,
+      1 -> 4, 4 -> 7
+      1 -> 5
     )
 
   "loading DAG" - {
@@ -73,10 +69,10 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
       val state = DagState(TreeMap((1L, initialState)), Set.empty)
       val expectedResult =
         TreeSet(
-          Dependency(1L, Set(1), 2),
-          Dependency(1L, Set(1), 3),
-          Dependency(1L, Set(1), 4),
-          Dependency(1L, Set(1), 5)
+          Dependency(1L, TreeSet(1), 2),
+          Dependency(1L, TreeSet(1), 3),
+          Dependency(1L, TreeSet(1), 4),
+          Dependency(1L, TreeSet(1), 5)
         )
       assertResult(expectedResult)(state.getPendingDeps)
       assert(!state.isSaturated)
@@ -85,15 +81,15 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
     "when pending has multiple parents" in {
       val initialState = (1 to 7).map(_ -> Complete).toMap ++ Map(6 -> Pending)
       val state = DagState(TreeMap((1L, initialState)), Set.empty)
-      val expectedResult = TreeSet(Dependency(1L, Set(3,2), 6))
+      val expectedResult = TreeSet(Dependency(1L, TreeSet(3,2), 6))
       assertResult(expectedResult)(state.getPendingDeps)
       assert(!state.isSaturated)
     }
 
     "when one of ancestors is not complete" in {
-      val initialState = (1 to 7).map(_ -> Complete).toMap ++ Set(3,6).map(_ -> Pending)
+      val initialState = (1 to 7).map(_ -> Complete).toMap ++ TreeSet(3,6).map(_ -> Pending)
       val state = DagState(TreeMap((1L, initialState)), Set.empty)
-      val expectedResult = TreeSet(Dependency(1L, Set(1), 3))
+      val expectedResult = TreeSet(Dependency(1L, TreeSet(1), 3))
       assertResult(expectedResult)(state.getPendingDeps)
       assert(!state.isSaturated)
     }
@@ -131,7 +127,7 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
     val initialState = (1 to 7).map(_ -> Complete).toMap ++ Map(6 -> InProgress)
     val state = DagState(TreeMap((1L, initialState)), Set.empty)
     val expectedState: Map[DagVertex, String] = initialState + (6 -> Complete)
-    val actualState = state.updated(SaturationSucceededEvent(Dependency(1L, Set(2,3), 6)))
+    val actualState = state.updated(SaturationSucceededEvent(Dependency(1L, TreeSet(2,3), 6)))
     assertResult(expectedState)(actualState.getVertexStatesFor(1L))
     assert(actualState.isSaturated)
   }
@@ -148,14 +144,14 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
   "redo dag branch" in {
     val initialState = (1 to 7).map(_ -> Complete).toMap
     val state = DagState(TreeMap((1L, initialState)), Set.empty)
-    val expectedState: Map[DagVertex, String] = initialState ++ Set(4,7).map(_ -> Pending)
+    val expectedState: Map[DagVertex, String] = initialState ++ TreeSet(4,7).map(_ -> Pending)
     val actualState = state.updated(DagBranchRedoEvent(1L, 4))
     assertResult(expectedState)(actualState.getVertexStatesFor(1L))
     assert(!actualState.isSaturated)
   }
 
   "fix partition" in {
-    val initialState = (1 to 7).map(_ -> Pending).toMap ++ Set(1,3,4).map(_ -> Complete) ++ Map(2 -> Failed)
+    val initialState = (1 to 7).map(_ -> Pending).toMap ++ TreeSet(1,3,4).map(_ -> Complete) ++ Map(2 -> Failed)
     val state = DagState(TreeMap((1L, initialState)), Set.empty)
     val expectedState: Map[DagVertex, String] = initialState ++ Map(2 -> Pending)
     val actualState = state.updated(PartitionFixEvent(1L))
@@ -164,7 +160,7 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
   }
 
   "redo whole partition" in {
-    val initialState = (1 to 7).map(_ -> Pending).toMap ++ Set(1,3,4).map(_ -> Complete) ++ Map(2 -> Failed)
+    val initialState = (1 to 7).map(_ -> Pending).toMap ++ TreeSet(1,3,4).map(_ -> Complete) ++ Map(2 -> Failed)
     val state = DagState(TreeMap((1L, initialState)), Set.empty)
     val expectedState: Map[DagVertex, String] = (1 to 7).map(_ -> Pending).toMap ++ Map(1 -> Complete)
     val actualState = state.updated(DagBranchRedoEvent(1L, 1))
@@ -177,7 +173,7 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
       val initialState = (1 to 7).map(_ -> Complete).toMap ++ Map(7 -> InProgress)
       val state = DagState(TreeMap((1L, initialState)), Set.empty)
       val expectedState: Map[DagVertex, String] = initialState ++ Map(7 -> Failed)
-      val actualState = state.updated(SaturationFailedEvent(Dependency(1L, Set(4), 7)))
+      val actualState = state.updated(SaturationFailedEvent(Dependency(1L, TreeSet(4), 7)))
       assertResult(expectedState)(actualState.getVertexStatesFor(1L))
       assert(actualState.isSaturated)
     }
@@ -186,7 +182,7 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
       val initialState = (1 to 7).map(_ -> Complete).toMap ++ Map(2 -> InProgress, 6 -> Pending)
       val state = DagState(TreeMap((1L, initialState)), Set.empty)
       val expectedState: Map[DagVertex, String] = initialState ++ Map(2 -> Failed)
-      val actualState = state.updated(SaturationFailedEvent(Dependency(1L, Set(1), 2)))
+      val actualState = state.updated(SaturationFailedEvent(Dependency(1L, TreeSet(1), 2)))
       assertResult(expectedState)(actualState.getVertexStatesFor(1L))
       assert(actualState.isSaturated)
     }
@@ -195,7 +191,7 @@ class DagStateSpec extends FreeSpec with ScalaFutures with Matchers with BeforeA
       val initialState = (1 to 7).map(_ -> Complete).toMap ++ Map(6 -> InProgress)
       val state = DagState(TreeMap((1L, initialState)), Set.empty)
       val expectedState: Map[DagVertex, String] = initialState ++ Map(6 -> Failed)
-      val actualState = state.updated(SaturationFailedEvent(Dependency(1L, Set(2,3), 6)))
+      val actualState = state.updated(SaturationFailedEvent(Dependency(1L, TreeSet(2,3), 6)))
       assertResult(expectedState)(actualState.getVertexStatesFor(1L))
       assert(actualState.isSaturated)
     }

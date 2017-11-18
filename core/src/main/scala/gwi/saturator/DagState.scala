@@ -20,9 +20,10 @@ protected[saturator] object DagState {
     }
   }
 
-  protected[saturator] def empty(implicit po: Ordering[DagPartition]): DagState =
+  protected[saturator] def empty(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState =
     DagState(vertexStatesByPartition = TreeMap.empty[DagPartition, TreeMap[DagVertex, String]], depsInFlight = Set.empty[Dependency])
-  protected[saturator] def initialized(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]]) =
+  protected[saturator] def initialized(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]])
+                                      (implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]) =
     DagState(vertexStatesByPartition, Set.empty)
 
   protected[saturator] sealed trait DagStateEvent
@@ -42,10 +43,12 @@ protected[saturator] object DagState {
   }
 }
 
-case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends PrintableSupport with LazyLogging {
-  import Dag._
+case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency])
+                           (implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]) extends PrintableSupport with LazyLogging {
   import DagState._
   import DagVertex.State._
+
+  protected val dag = Dag(edges)
 
   private[this] def alienPartitionsError(vertexPartitions: Map[DagVertex, Set[DagPartition]], rootVertexPartitions: Set[DagPartition]) = {
     val (vertex, partitions) = vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map( t => t._1 -> t._2.diff(rootVertexPartitions)).get
@@ -53,18 +56,18 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
     s"Root partitions : ${rootVertexPartitions.mkString("\n","\n","\n")}Vertex partitions : ${vertexPartitions.find(_._2.diff(rootVertexPartitions).nonEmpty).map(_._2.mkString("\n","\n","\n"))}"
   }
 
-  private[this] def getDepsByState(targetVertexState: String)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] =
+  private[this] def getDepsByState(targetVertexState: String): Set[Dependency] =
     TreeSet(
       vertexStatesByPartition.flatMap { case (p, partitionStateByVertex) =>
         partitionStateByVertex
-          .collect { case (v, ps) if ps == targetVertexState && Dag.ancestorsOf(v, edges).forall(partitionStateByVertex(_) == Complete) =>
-            Dependency(p, Dag.neighborAncestorsOf(v, edges), v)
+          .collect { case (v, ps) if ps == targetVertexState && dag.ancestorsOf(v).forall(partitionStateByVertex(_) == Complete) =>
+            Dependency(p, dag.neighborAncestorsOf(v), v)
           }
       }.toSeq:_*
     )
 
-  private[this] def saturationSanityCheck(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex)(implicit edges: Set[(DagVertex, DagVertex)]) = {
-    val neighborDescendants = neighborDescendantsOf(targetVertex, edges)
+  private[this] def saturationSanityCheck(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex): Unit = {
+    val neighborDescendants = dag.neighborDescendantsOf(targetVertex)
     val partitionStateByVertex = vertexStatesByPartition(p)
     require(
       sourceVertices.forall(partitionStateByVertex(_) == Complete) && partitionStateByVertex(targetVertex) == InProgress && partitionStateByVertex.filterKeys(neighborDescendants.contains).forall(_._2 == Pending),
@@ -72,10 +75,10 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
     )
   }
 
-  private[this] def redoPartitionBranch(p: DagPartition, vertex: DagVertex, partitionStateByVertex: Map[DagVertex, String])(implicit edges: Set[(DagVertex, DagVertex)]): Option[Map[DagVertex, String]] = {
-    val branch = descendantsOf(vertex, edges) ++ Option(vertex).filter(_ != Dag.root(edges))
+  private[this] def redoPartitionBranch(p: DagPartition, vertex: DagVertex, partitionStateByVertex: Map[DagVertex, String]): Option[Map[DagVertex, String]] = {
+    val branch = dag.descendantsOf(vertex)() ++ Option(vertex).filter(_ != dag.root)
     val branchStates = branch.map(partitionStateByVertex)
-    val ancestorStates = ancestorsOf(vertex, edges).map(partitionStateByVertex)
+    val ancestorStates = dag.ancestorsOf(vertex).map(partitionStateByVertex)
     if (branchStates.contains(InProgress)) {
       logger.warn(s"Redoing dag branch of $vertex with progressing partition $p is not allowed :\n${mkString(p).get}")
       None
@@ -86,27 +89,27 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       Some(partitionStateByVertex ++ branch.map(_ -> Pending))
   }
 
-  def getRoot(implicit edges: Set[(DagVertex, DagVertex)]): DagVertex = Dag.root(edges)
+  def getRoot(implicit edges: Set[(DagVertex, DagVertex)]): DagVertex = dag.root
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
   def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
-    vertexStates(root(edges)) == Complete && descendantsOfRoot[DagVertex](edges, v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
+    vertexStates(dag.root) == Complete && dag.descendantsOfRoot(v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
   }
   protected[saturator] def getVertexStatesFor(p: DagPartition): Map[DagVertex, String] = vertexStatesByPartition(p)
-  protected[saturator] def getPendingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(Pending)
-  protected[saturator] def getNewProgressingDeps(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): Set[Dependency] = getDepsByState(InProgress) -- depsInFlight
+  protected[saturator] def getPendingDeps: Set[Dependency] = getDepsByState(Pending)
+  protected[saturator] def getNewProgressingDeps: Set[Dependency] = getDepsByState(InProgress) -- depsInFlight
 
-  protected[saturator] def updated(event: DagStateEvent)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState = event match {
+  protected[saturator] def updated(event: DagStateEvent): DagState = event match {
     case StateInitializedEvent(partitionsByVertex) =>
-      val rootVertex = Dag.root(edges)
+      val rootVertex = dag.root
       val rootVertexPartitions = partitionsByVertex(rootVertex)
       val vertexPartitions = partitionsByVertex.filterKeys(_ != rootVertex)
       if(!vertexPartitions.forall(_._2.diff(rootVertexPartitions).isEmpty))
         logger.warn(alienPartitionsError(vertexPartitions, rootVertexPartitions))
 
       def buildGraphForPartition(p: DagPartition, vertex: DagVertex): Map[DagVertex, String] = {
-        def isComplete = (Dag.ancestorsOf(vertex, edges) + vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
+        def isComplete = (dag.ancestorsOf(vertex) + vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
         val state = if (vertex == rootVertex || isComplete) Complete else Pending
-        Dag.neighborDescendantsOf(vertex, edges).flatMap(buildGraphForPartition(p, _)).toMap + (vertex -> state)
+        dag.neighborDescendantsOf(vertex).flatMap(buildGraphForPartition(p, _)).toMap + (vertex -> state)
       }
       DagState.initialized(TreeMap(rootVertexPartitions.map(p => p -> buildGraphForPartition(p, rootVertex)).toSeq:_*))
 
@@ -136,13 +139,13 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       newState
 
     case PartitionInsertsEvent(partitions) =>
-      val rootVertex = Dag.root(edges)
-      val partitionStateByVertex = allVertices(edges).map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
+      val rootVertex = dag.root
+      val partitionStateByVertex = dag.allVertices.map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
       logger.info(s"Partitions created : ${partitions.mkString("\n","\n","\n")}")
       copy(vertexStatesByPartition = vertexStatesByPartition ++ partitions.map(_ -> partitionStateByVertex))
 
     case PartitionUpdatesEvent(partitions) =>
-      val rootVertex = Dag.root(edges)
+      val rootVertex = dag.root
       partitions.filter(vertexStatesByPartition.contains).foreach( p => logger.error(s"Partition $p cannot be changed because it is missing !!!") )
       val changedStatesByPartition =
         partitions
@@ -165,9 +168,9 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       newState
 
     case PartitionFixEvent(p) =>
-      val rootVertex = Dag.root(edges)
+      val rootVertex = dag.root
       val partitionStateByVertex = vertexStatesByPartition(p)
-      val rootDescendants = descendantsOf(rootVertex, edges)
+      val rootDescendants = dag.descendantsOf(rootVertex)()
       require(!rootDescendants.map(partitionStateByVertex).contains(InProgress), s"Fixing progressing partition $p is not allowed :\n${mkString(p).get}")
       val toBePendingVertices = rootDescendants.filter(partitionStateByVertex(_) == Failed)
       val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(partitionStateByVertex => partitionStateByVertex ++ toBePendingVertices.map(_ -> Pending)))
@@ -179,20 +182,20 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
 }
 
 sealed trait PrintableSupport { this: DagState =>
-  def printable(implicit edges: Set[(DagVertex, DagVertex)]): Map[String, PrintableState] =
+  def printable: Map[String, PrintableState] =
     vertexStatesByPartition.map { case (p, vertexStates) =>
       p.pid -> PrintableState(mkString(p).get, vertexStates.values)
     }(breakOut)
 
-  def mkString(p: DagPartition)(implicit edges: Set[(DagVertex, DagVertex)]): Option[String] =
+  def mkString(p: DagPartition): Option[String] =
     vertexStatesByPartition.get(p).map { vertexStates =>
       val stateByVertex = vertexStates.map { case (v, state) => v.vid -> state }
-      val edgesWithState: List[(String, String)] = edges.map(t => t._1.vid -> t._2.vid).map { case (f,t) => s"$f\n${stateByVertex(f)}" -> s"$t\n${stateByVertex(t)}" }(breakOut)
+      val edgesWithState: List[(String, String)] = dag.edges.map(t => t._1.vid -> t._2.vid).map { case (f,t) => s"$f\n${stateByVertex(f)}" -> s"$t\n${stateByVertex(t)}" }(breakOut)
       val verticesWithState: Set[String] = stateByVertex.map { case (v, state) => s"$v\n$state"}(breakOut)
       GraphLayout.renderGraph(Graph(verticesWithState, edgesWithState))
     }
 
-  def mkString(implicit edges: Set[(DagVertex, DagVertex)]): String = printable.map { case (p,graph) => s"-----------------$p-----------------\n${graph.serializedGraph}"}.mkString("\n","\n","\n")
+  def mkString: String = printable.map { case (p,graph) => s"-----------------$p-----------------\n${graph.serializedGraph}"}.mkString("\n","\n","\n")
 }
 
 sealed trait PrintableState {

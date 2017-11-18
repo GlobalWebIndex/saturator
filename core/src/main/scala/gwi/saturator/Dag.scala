@@ -1,6 +1,10 @@
 package gwi.saturator
 
-protected[saturator] case class Dag[V](edges: Set[(V,V)]) {
+import scala.collection.immutable.{SortedSet, TreeSet}
+import scala.math.Ordering
+import collection.breakOut
+
+protected[saturator] case class Dag[V](edges: Set[(V,V)])(implicit vo: Ordering[V]) {
 
   def root: V = {
     val ancestorLessVertices = edges.flatMap(v => Set(v._1, v._2)) -- edges.map(_._2)
@@ -8,29 +12,32 @@ protected[saturator] case class Dag[V](edges: Set[(V,V)]) {
     ancestorLessVertices.head
   }
 
-  def allVertices: Set[V] = edges.flatMap(edge => Set(edge._1, edge._2))
+  def allVertices: SortedSet[V] = edges.flatMap(edge => TreeSet(edge._1, edge._2))(breakOut)
 
-  def descendantsOf(v: V, actualEdges: Set[(V,V)] = edges)(condition: V => Boolean = (_: V) => true): Set[V] = {
+  def descendantsOf(v: V, actualEdges: Set[(V,V)] = edges)(condition: V => Boolean = (_: V) => true): SortedSet[V] = {
     val (outgoingEdges, remainingEdges) = actualEdges.partition(_._1 == v)
-    val neighborDescendants = outgoingEdges.map(_._2).filter(t => condition(t) && ancestorsOf(t, actualEdges).forall(condition))
+    val neighborDescendants: TreeSet[V] =
+      outgoingEdges.collect {
+        case (_,child) if condition(child) && ancestorsOf(child, actualEdges).forall(condition) => child
+      }(breakOut)
     neighborDescendants ++ neighborDescendants.flatMap(descendantsOf(_, remainingEdges)(condition))
   }
 
-  def descendantsOfRoot(condition: V => Boolean = (_: V) => true): Set[V] =
+  def descendantsOfRoot(condition: V => Boolean = (_: V) => true): SortedSet[V] =
     descendantsOf(root)(condition)
 
-  def neighborDescendantsOf(v: V): Set[V] =
-    edges.collect { case (source,target) if source == v => target }
+  def neighborDescendantsOf(v: V): SortedSet[V] =
+    edges.collect { case (source,target) if source == v => target }(breakOut)
 
-  def neighborDescendantsOfRoot: Set[V] =
+  def neighborDescendantsOfRoot: SortedSet[V] =
     neighborDescendantsOf(root)
 
-  def neighborAncestorsOf(v: V): Set[V] =
-    edges.collect { case (source,target) if target == v => source }
+  def neighborAncestorsOf(v: V): SortedSet[V] =
+    edges.collect { case (source,target) if target == v => source }(breakOut)
 
-  def ancestorsOf(v: V, actualEdges: Set[(V,V)] = edges): Set[V] = {
+  def ancestorsOf(v: V, actualEdges: Set[(V,V)] = edges): SortedSet[V] = {
     val (incoming, remainingEdges) = actualEdges.partition(_._2 == v)
-    val neighborAncestors = incoming.map(_._1)
+    val neighborAncestors: TreeSet[V] = incoming.map(_._1)(breakOut)
     neighborAncestors ++ neighborAncestors.flatMap(ancestorsOf(_, remainingEdges))
   }
 

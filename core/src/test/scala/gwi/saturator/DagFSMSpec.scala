@@ -2,7 +2,6 @@ package gwi.saturator
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
-import akka.util.Timeout
 import gwi.saturator.DagFSM._
 import gwi.saturator.SaturatorCmd._
 import org.scalatest.{BeforeAndAfterAll, FreeSpecLike, Matchers, Suite}
@@ -12,7 +11,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagTestSupport with Matchers with FreeSpecLike with ImplicitSender {
-  private[this] implicit val timeout = Timeout(10.seconds)
   implicit lazy val system = ActorSystem("AkkaSuiteSystem")
 
   override def afterAll(): Unit = try Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf) finally super.afterAll()
@@ -44,12 +42,12 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
-      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 2)))
-      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 3)))
-      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 4)))
-      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 5)))
-      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(3,2), 6)))
-      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(4), 7)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(1), 2)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(1), 3)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(1), 4)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(1), 5)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(3,2), 6)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(4), 7)))
       assertResult(Saturated)(probe.expectMsgType[Issued].cmd)
     }
 
@@ -76,8 +74,8 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     fsmActor ! RedoDagBranch(2L, 2)
     expectMsgType[Submitted]
 
-    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, Set(1), 2)))
-    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, Set(3,2), 6)))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, TreeSet(1), 2)))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, TreeSet(3,2), 6)))
     assertResult(Saturated)(probe.expectMsgType[Issued].cmd)
 
     // saturation after recreating a partition
@@ -125,11 +123,11 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
-      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 2)))
-      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 3)))
-      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 4)))
-      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 5)))
-      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(4), 7)))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, TreeSet(1), 2)), Some(Dependency(p, TreeSet(1), 2)))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, TreeSet(1), 2)), Some(Dependency(p, TreeSet(1), 3)))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, TreeSet(1), 2)), Some(Dependency(p, TreeSet(1), 4)))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, TreeSet(1), 2)), Some(Dependency(p, TreeSet(1), 5)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(4), 7)))
       assertResult(Saturated)(probe.expectMsgType[Issued].cmd)
     }
 
@@ -138,8 +136,8 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     fsmActor ! FixPartition(1L)
     expectMsgType[Submitted]
 
-    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, Set(1), 2)))
-    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, Set(3,2), 6)))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, TreeSet(1), 2)))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, TreeSet(3,2), 6)))
   }
 
   "testing multiple partition saturation roughly" in {
