@@ -19,13 +19,10 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
   implicit val edges: Set[(DagVertex, DagVertex)] =
     Set(
-      1 -> 2,
-      1 -> 3,
-      1 -> 4,
-      1 -> 5,
-      2 -> 6,
-      3 -> 6,
-      4 -> 7
+      1 -> 2, 2 -> 6,
+      1 -> 3, 3 -> 6,
+      1 -> 4, 4 -> 7,
+      1 -> 5
     )
 
   private[this] def handleIssuedCmd(probe: TestProbe, fsmActor: ActorRef, failedDep: Option[Dependency], expectedDepOpt: Option[Dependency] = Option.empty): Dependency =
@@ -40,10 +37,10 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
   "testing one partition saturation thoroughly" in {
 
-    def init: List[(Int, List[Long])] = List(1 -> List(1L))
+    def partitionsByVertex: List[(Int, List[Long])] = List(1 -> List(1L))
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(init, probe.ref, None, "test-dag-fsm")
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, None, "test-dag-fsm")
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
@@ -110,7 +107,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
     // persistent state replaying
     Thread.sleep(300)
-    val newFsmActor = DagFSM(init, probe.ref, None, "test-dag-fsm")
+    val newFsmActor = DagFSM(partitionsByVertex, probe.ref, None, "test-dag-fsm")
 
     newFsmActor ! ShutDown
     expectMsgType[Submitted] match { case (Submitted(cmd, status, state, log)) =>
@@ -122,9 +119,9 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
   }
 
   "testing partition fixing" in {
-    def init: List[(Int, List[Long])] = List(1 -> List(1L))
+    def partitionsByVertex: List[(Int, List[Long])] = List(1 -> List(1L))
     val probe = TestProbe()
-    val fsmActor = DagFSM(init, probe.ref, None, "dag-fsm-2")
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, None, "dag-fsm-2")
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
@@ -146,7 +143,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
   }
 
   "testing multiple partition saturation roughly" in {
-    def init: List[(Int, List[Long])] =
+    val partitionsByVertex: List[(Int, List[Long])] =
       List(
         1 -> (1L to 9L).toList,
         2 -> (1L to 7L).toList,
@@ -158,17 +155,21 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
       )
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(init, probe.ref, None, "dag-fsm-3")
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, None, "dag-fsm-4")
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
-    val depsToSaturate =
-      (1 to 30).map { _ =>
-        handleIssuedCmd(probe, fsmActor, None)
-      }
+    val depsToSaturate = (1 to 30).map ( _ => handleIssuedCmd(probe, fsmActor, None) )
 
-    // test partition order
-    val partitionsToSaturate = depsToSaturate.map(_.p.pid.toInt).toList
-    assertResult(partitionsToSaturate.sorted)(partitionsToSaturate)
+    // test partition ordering - absolute order of partition saturation would be ineffective because partition out of order could be executed in the mean time
+    depsToSaturate.groupBy(_.sourceVertices.head.vid).values.foreach { depsWithSameSourceVertex =>
+      val headVertexSaturationPartitions = depsWithSameSourceVertex.map(_.p.pid.toInt)
+      assertResult(headVertexSaturationPartitions.sorted)(headVertexSaturationPartitions)
+    }
+    // test vertex ordering - vertices within partition should be always executed in order
+    depsToSaturate.groupBy(_.p.pid).values.foreach { partitionDeps =>
+      val headVertexSaturationPartitions = partitionDeps.map(_.sourceVertices.head.vid.toInt)
+      assertResult(headVertexSaturationPartitions.sorted)(headVertexSaturationPartitions)
+    }
 
     fsmActor ! ShutDown
     expectMsgType[Submitted] match { case (Submitted(cmd, status, state, log)) =>
