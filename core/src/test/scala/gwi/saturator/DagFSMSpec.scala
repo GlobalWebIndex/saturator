@@ -1,19 +1,21 @@
 package gwi.saturator
 
 import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.typesafe.config.ConfigFactory
+import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
+import akka.util.Timeout
 import gwi.saturator.DagFSM._
 import gwi.saturator.SaturatorCmd._
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpecLike, Matchers}
-import redis.RedisClient
+import org.scalatest.{BeforeAndAfterAll, FreeSpecLike, Matchers, Suite}
 
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system) with DockerSupport with Matchers with FreeSpecLike with BeforeAndAfterAll with BeforeAndAfterEach with ImplicitSender {
-  import DagMock._
+class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagTestSupport with Matchers with FreeSpecLike with ImplicitSender {
+  private[this] implicit val timeout = Timeout(10.seconds)
+  implicit lazy val system = ActorSystem("AkkaSuiteSystem")
+
+  override def afterAll(): Unit = try Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf) finally super.afterAll()
 
   implicit val edges: Set[(DagVertex, DagVertex)] =
     Set(
@@ -26,13 +28,12 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
       4 -> 7
     )
 
-  def handleIssuedCmd(probe: TestProbe, fsmActor: ActorRef, failedDep: Option[Dependency], expectedDepsOpt: Option[Set[Dependency]] = Option.empty): Unit =
+  private[this] def handleIssuedCmd(probe: TestProbe, fsmActor: ActorRef, failedDep: Option[Dependency], expectedDepOpt: Option[Dependency] = Option.empty): Dependency =
     probe.expectMsgType[Issued] match {
-      case Issued(Saturate(deps),_,_,_) if expectedDepsOpt.isEmpty || expectedDepsOpt.contains(deps) =>
-        deps.foreach { dep =>
-          fsmActor ! SaturationResponse(dep, !failedDep.contains(dep))
-          expectMsgType[Submitted]
-        }
+      case Issued(Saturate(dep),_,_,_) if expectedDepOpt.isEmpty || expectedDepOpt.contains(dep) =>
+        fsmActor ! SaturationResponse(dep, !failedDep.contains(dep))
+        expectMsgType[Submitted]
+        dep
       case x =>
         sys.error(s"Unexpected message $x")
     }
@@ -46,18 +47,12 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
-      handleIssuedCmd(probe, fsmActor, None,
-        Some(
-          TreeSet(
-            Dependency(p, Set(1), 2),
-            Dependency(p, Set(1), 3),
-            Dependency(p, Set(1), 4),
-            Dependency(p, Set(1), 5)
-          )
-        )
-      )
-      handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(p, Set(3,2), 6))))
-      handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(p, Set(4), 7))))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 2)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 3)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 4)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(1), 5)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(3,2), 6)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(4), 7)))
       assertResult(Saturated)(probe.expectMsgType[Issued].cmd)
     }
 
@@ -84,8 +79,8 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     fsmActor ! RedoDagBranch(2L, 2)
     expectMsgType[Submitted]
 
-    handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(1), 2))))
-    handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(2L, Set(3,2), 6))))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, Set(1), 2)))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, Set(3,2), 6)))
     assertResult(Saturated)(probe.expectMsgType[Issued].cmd)
 
     // saturation after recreating a partition
@@ -133,17 +128,11 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
-      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)),
-        Some(
-          TreeSet(
-            Dependency(p, Set(1), 2),
-            Dependency(p, Set(1), 3),
-            Dependency(p, Set(1), 4),
-            Dependency(p, Set(1), 5)
-          )
-        )
-      )
-      handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(p, Set(4), 7))))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 2)))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 3)))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 4)))
+      handleIssuedCmd(probe, fsmActor, Some(Dependency(p, Set(1), 2)), Some(Dependency(p, Set(1), 5)))
+      handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, Set(4), 7)))
       assertResult(Saturated)(probe.expectMsgType[Issued].cmd)
     }
 
@@ -152,8 +141,8 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     fsmActor ! FixPartition(1L)
     expectMsgType[Submitted]
 
-    handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(1L, Set(1), 2))))
-    handleIssuedCmd(probe, fsmActor, None, Some(TreeSet(Dependency(1L, Set(3,2), 6))))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, Set(1), 2)))
+    handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, Set(3,2), 6)))
   }
 
   "testing multiple partition saturation roughly" in {
@@ -172,13 +161,14 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     val fsmActor = DagFSM(init, probe.ref, None, "dag-fsm-3")
     assertResult(Initialized)(probe.expectMsgType[Issued].cmd)
 
-    handleIssuedCmd(probe, fsmActor, None)
-    handleIssuedCmd(probe, fsmActor, None)
-    handleIssuedCmd(probe, fsmActor, None)
-    handleIssuedCmd(probe, fsmActor, None)
-    handleIssuedCmd(probe, fsmActor, None)
-    handleIssuedCmd(probe, fsmActor, None)
-    handleIssuedCmd(probe, fsmActor, None)
+    val depsToSaturate =
+      (1 to 30).map { _ =>
+        handleIssuedCmd(probe, fsmActor, None)
+      }
+
+    // test partition order
+    val partitionsToSaturate = depsToSaturate.map(_.p.pid.toInt).toList
+    assertResult(partitionsToSaturate.sorted)(partitionsToSaturate)
 
     fsmActor ! ShutDown
     expectMsgType[Submitted] match { case (Submitted(cmd, status, state, log)) =>
@@ -188,55 +178,4 @@ abstract class AbstractDagFSMSpec(_system: ActorSystem) extends TestKit(_system)
     }
 
   }
-}
-
-class DynamoDagFSMSpec(_system: ActorSystem) extends AbstractDagFSMSpec(_system: ActorSystem) {
-  def this() = this(ActorSystem("DynamoDagFSMSpec", ConfigFactory.load("dynamo").withFallback(ConfigFactory.parseResources("reference.conf")).resolve()))
-
-  private[this] val dynamoInit =
-    """
-      aws \
-       --endpoint-url=http://localhost:8000 dynamodb create-table \
-       --table-name akka-persistence \
-       --attribute-definitions \
-           AttributeName=par,AttributeType=S \
-           AttributeName=num,AttributeType=N \
-       --key-schema AttributeName=par,KeyType=HASH AttributeName=num,KeyType=RANGE \
-       --provisioned-throughput ReadCapacityUnits=10000,WriteCapacityUnits=10000
-    """.stripMargin
-
-  override def beforeAll(): Unit = try super.beforeAll() finally {
-    startContainer("dwmkerr/dynamodb", "dynamo-test", Seq(PPorts.from(8000,8000)), Some("-sharedDb")) {
-      startContainer("garland/aws-cli-docker", "dynamo-init", Seq.empty, Some(dynamoInit))(())
-    }
-    Thread.sleep(1000)
-  }
-
-  override def afterAll(): Unit = try {
-    stopContainer("dynamo-test") {
-      stopContainer("dynamo-init")(())
-    }
-    Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf)
-  } finally super.afterAll()
-}
-
-class RedisDagFSMSpec(_system: ActorSystem) extends AbstractDagFSMSpec(_system: ActorSystem) {
-  def this() = this(ActorSystem("RedisDagFSMSpec", ConfigFactory.load("redis").withFallback(ConfigFactory.parseResources("reference.conf")).resolve()))
-
-  private[this] var redisClient: RedisClient = null
-
-  override def beforeAll(): Unit = try super.beforeAll() finally {
-    startContainer("redis", "redis-test", Seq(PPorts.from(6379,6379)), None)(())
-    Thread.sleep(1000)
-    redisClient = RedisClient("localhost", 6379, name = "test-redis-client")
-  }
-
-  override def afterEach(): Unit = try {
-    Await.ready(redisClient.flushall(), 2.seconds)
-  } finally super.afterAll()
-
-  override def afterAll(): Unit = try {
-    stopContainer("redis-test")(())
-    Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf)
-  } finally super.afterAll()
 }
