@@ -20,9 +20,6 @@ notifications:
   email:
     recipients:
       - liska.jakub@gmail.com
-before_install:
-    - docker pull dwmkerr/dynamodb
-    - docker pull garland/aws-cli-docker
 before_script:
     - rm -rf ${HOME}/.sbt/0.13/staging
 script:
