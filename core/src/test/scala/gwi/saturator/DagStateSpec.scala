@@ -1,8 +1,8 @@
 package gwi.saturator
 
 import gwi.saturator.DagState._
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpec, Matchers}
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpec, Matchers}
 
 import scala.collection.immutable.{TreeMap, TreeSet}
 
@@ -12,7 +12,7 @@ class DagStateSpec extends FreeSpec with DagTestSupport with ScalaFutures with M
     Set(
       1 -> 2, 2 -> 6,
       1 -> 3, 3 -> 6,
-      1 -> 4, 4 -> 7
+      1 -> 4, 4 -> 7,
       1 -> 5
     )
 
