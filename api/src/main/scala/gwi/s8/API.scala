@@ -75,8 +75,9 @@ private[s8] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPart
 object in {
   sealed trait S8IncomingMsg extends S8Msg
   sealed trait S8IncomingCmd extends S8IncomingMsg
+  sealed trait S8IncomingInfo extends S8IncomingMsg
 
-  case class AckSaturation(dep: Dependency, succeeded: Boolean) extends S8IncomingMsg
+  case class AckSaturation(dep: Dependency, succeeded: Boolean) extends S8IncomingInfo
 
   case class RedoDagBranch(p: DagPartition, vertex: DagVertex) extends S8IncomingCmd
   case class FixPartition(p: DagPartition) extends S8IncomingCmd
@@ -89,8 +90,10 @@ object in {
 object out {
   sealed trait S8OutgoingMsg extends S8Msg
   sealed trait S8OutgoingCmd extends S8OutgoingMsg
-  case object Saturated extends S8OutgoingMsg
-  case object Initialized extends S8OutgoingMsg
+  sealed trait S8OutgoingInfo extends S8OutgoingMsg
+
+  case object Saturated extends S8OutgoingInfo
+  case object Initialized extends S8OutgoingInfo
 
   case class Saturate(dep: Dependency) extends S8OutgoingCmd
   case class GetCreatedPartitions(rootVertex: DagVertex) extends S8OutgoingCmd
