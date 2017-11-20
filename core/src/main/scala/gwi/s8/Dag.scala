@@ -1,10 +1,10 @@
-package gwi.saturator
+package gwi.s8
 
-import scala.collection.immutable.{SortedSet, TreeSet}
-import scala.math.Ordering
+import collection.immutable.{SortedSet, TreeSet}
+import math.Ordering
 import collection.breakOut
 
-protected[saturator] case class Dag[V](edges: Set[(V,V)])(implicit vo: Ordering[V]) {
+protected[s8] case class Dag[V](edges: Set[(V,V)])(implicit vo: Ordering[V]) {
 
   def root: V = {
     val ancestorLessVertices = edges.flatMap(v => Set(v._1, v._2)) -- edges.map(_._2)

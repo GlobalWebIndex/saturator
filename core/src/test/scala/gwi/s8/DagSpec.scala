@@ -1,4 +1,4 @@
-package gwi.saturator
+package gwi.s8
 
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpec, Matchers}
 import org.scalatest.concurrent.ScalaFutures

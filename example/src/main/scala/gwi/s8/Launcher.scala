@@ -1,14 +1,13 @@
-package gwi.saturator
+package gwi.s8
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import gwi.saturator.DagFSM.{Issued, PartitionChangesSchedule}
-import gwi.saturator.SaturatorCmd._
+import gwi.s8.DagFSM.{Issued, PartitionChangesSchedule}
 import org.backuity.clist._
 import org.backuity.clist.util.Read
 
-import scala.collection.immutable.TreeSet
-import scala.concurrent.duration._
+import collection.immutable.TreeSet
+import concurrent.duration._
 
 object Launcher extends CliMain[Unit] {
 
@@ -54,12 +53,12 @@ class Example(edges: Set[(DagVertex,DagVertex)], init: => List[(DagVertex, List[
   private[this] val dagFSM = DagFSM(init, self, Some(PartitionChangesSchedule(interval, interval)), "example-dag-fsm")
 
   def receive: Receive = {
-    case Issued(GetPartitionChanges(_),_,_,_) =>
-      dagFSM ! PartitionInserts(TreeSet(DagPartition(partitionCounter.toString)))
+    case Issued(out.GetPartitionChanges(_),_,_,_) =>
+      dagFSM ! in.InsertPartitions(TreeSet(DagPartition(partitionCounter.toString)))
       log.info(s"New partition created ${partitionCounter.toString} ...")
       partitionCounter+=1
-    case Issued(Saturate(dep), _, _, _) =>
+    case Issued(out.Saturate(dep), _, _, _) =>
       log.info("Saturating {}", dep)
-      dagFSM ! SaturationResponse(dep,true)
+      dagFSM ! in.AckSaturation(dep,true)
   }
 }

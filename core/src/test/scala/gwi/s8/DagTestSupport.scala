@@ -1,7 +1,7 @@
-package gwi.saturator
+package gwi.s8
 
 trait DagTestSupport {
-  import scala.language.implicitConversions
+  import language.implicitConversions
 
   implicit object intVertexOrdering extends Ordering[DagVertex] {
     override def compare(x: DagVertex, y: DagVertex): Int =

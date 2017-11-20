@@ -1,14 +1,14 @@
-package gwi.saturator
+package gwi.s8
 
 import com.github.mdr.ascii.graph.Graph
 import com.github.mdr.ascii.layout.GraphLayout
 import com.typesafe.scalalogging.LazyLogging
 
-import scala.collection.immutable.{TreeMap, TreeSet}
-import scala.math.Ordering
+import collection.immutable.{TreeMap, TreeSet}
+import math.Ordering
 import collection.{Iterable, breakOut}
 
-protected[saturator] object DagState {
+protected[s8] object DagState {
   implicit class TreeMapPimp[K, V](underlying: TreeMap[K, V]) {
     def adjust(k: K)(f: V => V): TreeMap[K, V] = underlying.updated(k, f(underlying(k)))
     def adjustOpt(k: K)(f: Option[V] => V): TreeMap[K, V] = underlying updated(k, f(underlying.get(k)))
@@ -20,26 +20,26 @@ protected[saturator] object DagState {
     }
   }
 
-  protected[saturator] def empty(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState =
+  protected[s8] def empty(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): DagState =
     DagState(vertexStatesByPartition = TreeMap.empty[DagPartition, TreeMap[DagVertex, String]], depsInFlight = Set.empty[Dependency])
-  protected[saturator] def initialized(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]])
-                                      (implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]) =
+  protected[s8] def initialized(vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]])
+                               (implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]) =
     DagState(vertexStatesByPartition, Set.empty)
 
-  protected[saturator] sealed trait DagStateEvent
-  protected[saturator] case class StateInitializedEvent(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends DagStateEvent
-  protected[saturator] case object SaturationInitializedEvent extends DagStateEvent
-  protected[saturator] case class SaturationSucceededEvent(dep: Dependency) extends DagStateEvent
-  protected[saturator] case class SaturationFailedEvent(dep: Dependency) extends DagStateEvent
-  protected[saturator] case class PartitionInsertsEvent(partitions: TreeSet[DagPartition]) extends DagStateEvent
-  protected[saturator] case class PartitionUpdatesEvent(partitions: TreeSet[DagPartition]) extends DagStateEvent
+  protected[s8] sealed trait DagStateEvent
+  protected[s8] case class StateInitializedEvent(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends DagStateEvent
+  protected[s8] case object SaturationInitializedEvent extends DagStateEvent
+  protected[s8] case class SaturationSucceededEvent(dep: Dependency) extends DagStateEvent
+  protected[s8] case class SaturationFailedEvent(dep: Dependency) extends DagStateEvent
+  protected[s8] case class PartitionInsertsEvent(partitions: TreeSet[DagPartition]) extends DagStateEvent
+  protected[s8] case class PartitionUpdatesEvent(partitions: TreeSet[DagPartition]) extends DagStateEvent
 
   sealed trait AdhocEvent extends DagStateEvent
-  protected[saturator] case class DagBranchRedoEvent(p: DagPartition, vertex: DagVertex) extends AdhocEvent
-  protected[saturator] case class PartitionFixEvent(p: DagPartition) extends AdhocEvent
+  protected[s8] case class DagBranchRedoEvent(p: DagPartition, vertex: DagVertex) extends AdhocEvent
+  protected[s8] case class PartitionFixEvent(p: DagPartition) extends AdhocEvent
 
   object DagStateEvent {
-    protected[saturator] def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
+    protected[s8] def forSaturationOutcome(succeeded: Boolean, dep: Dependency): DagStateEvent = if (succeeded) SaturationSucceededEvent(dep) else SaturationFailedEvent(dep)
   }
 }
 
@@ -89,16 +89,16 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       Some(partitionStateByVertex ++ branch.map(_ -> Pending))
   }
 
-  def getRoot(implicit edges: Set[(DagVertex, DagVertex)]): DagVertex = dag.root
+  def getRoot: DagVertex = dag.root
   def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
-  def isSaturated(implicit edges: Set[(DagVertex, DagVertex)]): Boolean = vertexStatesByPartition.values.forall { vertexStates =>
+  def isSaturated: Boolean = vertexStatesByPartition.values.forall { vertexStates =>
     vertexStates(dag.root) == Complete && dag.descendantsOfRoot(v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
   }
-  protected[saturator] def getVertexStatesFor(p: DagPartition): Map[DagVertex, String] = vertexStatesByPartition(p)
-  protected[saturator] def getPendingDeps: Set[Dependency] = getDepsByState(Pending)
-  protected[saturator] def getNewProgressingDeps: Set[Dependency] = getDepsByState(InProgress) -- depsInFlight
+  protected[s8] def getVertexStatesFor(p: DagPartition): Map[DagVertex, String] = vertexStatesByPartition(p)
+  protected[s8] def getPendingDeps: Set[Dependency] = getDepsByState(Pending)
+  protected[s8] def getNewProgressingDeps: Set[Dependency] = getDepsByState(InProgress) -- depsInFlight
 
-  protected[saturator] def updated(event: DagStateEvent): DagState = event match {
+  protected[s8] def updated(event: DagStateEvent): DagState = event match {
     case StateInitializedEvent(partitionsByVertex) =>
       val rootVertex = dag.root
       val rootVertexPartitions = partitionsByVertex(rootVertex)
