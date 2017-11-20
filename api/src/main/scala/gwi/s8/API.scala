@@ -2,6 +2,7 @@ package gwi.s8
 
 import collection.immutable.{SortedSet, TreeSet}
 import math.Ordering
+import scala.concurrent.duration._
 
 case class DagPartition(pid: String)
 
@@ -34,6 +35,37 @@ object Dependency {
 
 }
 
+sealed trait PartitionCheck {
+  def interval: FiniteDuration
+  def delay: FiniteDuration
+}
+object PartitionCheck {
+  def created(interval: FiniteDuration, delay: FiniteDuration) = CreatedPartitionCheck(interval, delay)
+  def changed(interval: FiniteDuration, delay: FiniteDuration) = ChangedPartitionCheck(interval, delay)
+}
+case class CreatedPartitionCheck(interval: FiniteDuration, delay: FiniteDuration) extends PartitionCheck
+case class ChangedPartitionCheck(interval: FiniteDuration, delay: FiniteDuration) extends PartitionCheck
+
+case class Schedule(createdPartitionCheck: Option[CreatedPartitionCheck], changedPartitionCheck: Option[ChangedPartitionCheck])
+
+object Schedule {
+  def noop = Schedule(None, None)
+}
+
+trait S8LauncherSupport {
+  import org.backuity.clist.util.Read
+
+  implicit def createdPartitionCheckRead: Read[CreatedPartitionCheck] = Read.reads("created-partition-check") { str =>
+    val Array(interval, delay) = str.split(":").filter(_.nonEmpty).map(_.toInt)
+    PartitionCheck.created(interval.seconds, delay.seconds)
+  }
+
+  implicit def changedPartitionCheckRead: Read[ChangedPartitionCheck] = Read.reads("changed-partition-check") { str =>
+    val Array(interval, delay) = str.split(":").filter(_.nonEmpty).map(_.toInt)
+    PartitionCheck.changed(interval.seconds, delay.seconds)
+  }
+}
+
 sealed trait S8Msg
 sealed trait S8Cmd extends S8Msg
 
@@ -61,5 +93,6 @@ object out {
   case object Initialized extends S8OutgoingMsg
 
   case class Saturate(dep: Dependency) extends S8OutgoingCmd
-  case class GetPartitionChanges(rootVertex: DagVertex) extends S8OutgoingCmd
+  case class GetCreatedPartitions(rootVertex: DagVertex) extends S8OutgoingCmd
+  case class GetChangedPartitions(rootVertex: DagVertex) extends S8OutgoingCmd
 }

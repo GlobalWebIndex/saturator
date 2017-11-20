@@ -1,20 +1,19 @@
 package gwi.s8
 
-import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Props}
+import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Cancellable, Props}
 import akka.persistence.fsm.PersistentFSM.{FSMState, LogEntry}
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
 import gwi.s8.DagFSM._
 import gwi.s8.DagState.DagStateEvent
 
 import concurrent.ExecutionContext.Implicits
-import concurrent.duration.FiniteDuration
 import math.Ordering
 import reflect.ClassTag
 
 class DagFSM(
         init: () => List[(DagVertex, List[DagPartition])],
         handler: ActorRef,
-        partitionChangesSchedule: Option[PartitionChangesSchedule]
+        schedule: Schedule
       )(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex])
   extends PersistentFSM[FSMState, DagState, DagStateEvent] with LoggingPersistentFSM[FSMState, DagState, DagStateEvent] with ActorLogging {
   import DagState._
@@ -25,11 +24,21 @@ class DagFSM(
 
   log.info(s"Starting DagFSM with persistence id $persistenceId ...")
 
-  private[this] def schedulePartitionCheck(currentState: DagState): Unit =
-    partitionChangesSchedule.foreach { case PartitionChangesSchedule(interval, delay) =>
-      log.info(s"Scheduling partition changes check ...")
-      context.system.scheduler.schedule(interval, delay, handler, Issued(out.GetPartitionChanges(currentState.getRoot), stateName, currentState, getLog))(Implicits.global, self)
-    }
+  private[this] def schedulePartitionCheck(currentState: DagState): List[Cancellable] = {
+    def scheduleCheck(checkOpt: Option[PartitionCheck], cmd: out.S8OutgoingCmd): Option[Cancellable] =
+      checkOpt.map { check =>
+        log.info(s"Scheduling partitions check : $cmd")
+        context.system.scheduler.schedule(
+          check.interval, check.delay, handler, Issued(cmd, stateName, currentState, getLog)
+        )(Implicits.global, self)
+      }
+
+    val Schedule(createdCheckOpt, changedCheckOpt) = schedule
+    List(
+      scheduleCheck(createdCheckOpt, out.GetCreatedPartitions(currentState.getRoot)),
+      scheduleCheck(changedCheckOpt, out.GetChangedPartitions(currentState.getRoot))
+    ).flatten
+  }
 
   startWith(DagEmpty, DagState.empty)
 
@@ -99,8 +108,6 @@ class DagFSM(
 }
 
 object DagFSM {
-  case class PartitionChangesSchedule(interval: FiniteDuration, delay: FiniteDuration)
-
   protected[s8] case object DagEmpty extends FSMState { override def identifier: String = "Empty" }
   protected[s8] case object Saturating extends FSMState { override def identifier: String = "Saturating" }
 
@@ -113,8 +120,8 @@ object DagFSM {
   case class Submitted(cmd: in.S8IncomingMsg, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[in.S8IncomingMsg]
   case class Issued(cmd: out.S8OutgoingMsg, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[out.S8OutgoingMsg]
 
-  def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, partitionChangesSchedule: Option[PartitionChangesSchedule], name: String)
+  def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, schedule: Schedule, name: String)
            (implicit arf: ActorRefFactory, edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): ActorRef = {
-    arf.actorOf(Props(classOf[DagFSM], init _, handler, partitionChangesSchedule, edges, po, vo), name)
+    arf.actorOf(Props(classOf[DagFSM], init _, handler, schedule, edges, po, vo), name)
   }
 }

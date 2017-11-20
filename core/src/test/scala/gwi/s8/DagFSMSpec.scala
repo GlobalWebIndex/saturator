@@ -37,7 +37,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     def partitionsByVertex: List[(Int, List[Long])] = List(1 -> List(1L))
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(partitionsByVertex, probe.ref, None, "test-dag-fsm")
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "test-dag-fsm")
     assertResult(out.Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
@@ -104,7 +104,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
     // persistent state replaying
     Thread.sleep(300)
-    val newFsmActor = DagFSM(partitionsByVertex, probe.ref, None, "test-dag-fsm")
+    val newFsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "test-dag-fsm")
 
     newFsmActor ! in.ShutDown
     expectMsgType[Submitted] match { case (Submitted(cmd, status, state, log)) =>
@@ -118,7 +118,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
   "testing partition fixing" in {
     def partitionsByVertex: List[(Int, List[Long])] = List(1 -> List(1L))
     val probe = TestProbe()
-    val fsmActor = DagFSM(partitionsByVertex, probe.ref, None, "dag-fsm-2")
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "dag-fsm-2")
     assertResult(out.Initialized)(probe.expectMsgType[Issued].cmd)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
@@ -152,7 +152,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
       )
 
     val probe = TestProbe()
-    val fsmActor = DagFSM(partitionsByVertex, probe.ref, None, "dag-fsm-4")
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "dag-fsm-4")
     assertResult(out.Initialized)(probe.expectMsgType[Issued].cmd)
 
     val depsToSaturate = (1 to 30).map ( _ => handleIssuedCmd(probe, fsmActor, None) )

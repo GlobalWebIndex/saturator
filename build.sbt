@@ -1,5 +1,5 @@
 
-version in ThisBuild := "0.2.6"
+version in ThisBuild := "0.2.7"
 crossScalaVersions in ThisBuild := Seq("2.12.3", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
@@ -12,6 +12,7 @@ lazy val saturator = (project in file("."))
 
 lazy val `saturator-api` = (project in file("api"))
   .enablePlugins(CommonPlugin)
+  .settings(libraryDependencies ++= clist)
   .settings(publishSettings("GlobalWebIndex", "saturator-api", s3Resolver))
 
 lazy val `saturator-core` = (project in file("core"))

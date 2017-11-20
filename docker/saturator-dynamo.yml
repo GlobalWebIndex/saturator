@@ -31,4 +31,4 @@ services:
             - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         depends_on:
             - dynamo-init
-        command: --edges=a-b,a-c,a-d,a-e,b-f,c-f,d-g --existing-head-partitions=1,2,3,4 --new-partition-interval=3 --persistence-plugin=dynamo
+        command: --edges=1-2,1-3,1-4,1-5,2-6,3-6,4-7 --existing-head-partitions=1,2,3,4 --created-partition-schedule=3:3 --changed-partition-schedule=10:10 --persistence-plugin=dynamo
