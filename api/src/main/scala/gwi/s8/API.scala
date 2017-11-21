@@ -81,10 +81,14 @@ object in {
 
   case class RedoDagBranch(p: DagPartition, vertex: DagVertex) extends S8IncomingCmd
   case class FixPartition(p: DagPartition) extends S8IncomingCmd
-  case class InsertPartitions(partitions: TreeSet[DagPartition]) extends S8IncomingCmd
-  case class UpdatePartitions(partitions: TreeSet[DagPartition]) extends S8IncomingCmd
   case object GetState extends S8IncomingCmd
   case object ShutDown extends S8IncomingCmd
+
+  sealed trait PartitionChanges extends S8IncomingCmd {
+    def partitions: TreeSet[DagPartition]
+  }
+  case class InsertPartitions(partitions: TreeSet[DagPartition]) extends PartitionChanges
+  case class UpdatePartitions(partitions: TreeSet[DagPartition]) extends PartitionChanges
 }
 
 object out {
