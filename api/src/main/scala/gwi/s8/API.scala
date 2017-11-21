@@ -96,6 +96,9 @@ object out {
   case object Initialized extends S8OutgoingInfo
 
   case class Saturate(dep: Dependency) extends S8OutgoingCmd
-  case class GetCreatedPartitions(rootVertex: DagVertex) extends S8OutgoingCmd
-  case class GetChangedPartitions(rootVertex: DagVertex) extends S8OutgoingCmd
+  sealed trait GetPartitions extends S8OutgoingCmd {
+    def rootVertex: DagVertex
+  }
+  case class GetCreatedPartitions(rootVertex: DagVertex) extends GetPartitions
+  case class GetChangedPartitions(rootVertex: DagVertex) extends GetPartitions
 }
