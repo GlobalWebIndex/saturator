@@ -2,7 +2,6 @@ package gwi.s8
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import gwi.s8.DagFSM.Issued
 import org.backuity.clist._
 import org.backuity.clist.util.Read
 
@@ -55,14 +54,14 @@ class Example(edges: Set[(DagVertex,DagVertex)], init: => List[(DagVertex, List[
   private[this] val dagFSM = DagFSM(init, self, schedule, "example-dag-fsm")
 
   def receive: Receive = {
-    case Issued(out.GetChangedPartitions(_),_,_,_) =>
+    case out.Issued(out.GetChangedPartitions(_),_,_) =>
       log.info(s"Partition changed ...")
       dagFSM ! in.InsertPartitions(TreeSet(DagPartition("1")))
-    case Issued(out.GetCreatedPartitions(_),_,_,_) =>
+    case out.Issued(out.GetCreatedPartitions(_),_,_) =>
       log.info(s"Partition created ${partitionCounter.toString} ...")
       dagFSM ! in.InsertPartitions(TreeSet(DagPartition(partitionCounter.toString)))
       partitionCounter+=1
-    case Issued(out.Saturate(dep), _, _, _) =>
+    case out.Issued(out.Saturate(dep),_,_) =>
       log.info("Saturating {}", dep)
       dagFSM ! in.AckSaturation(dep,true)
   }

@@ -1,14 +1,13 @@
 package gwi.s8
 
 import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Cancellable, Props}
-import akka.persistence.fsm.PersistentFSM.{FSMState, LogEntry}
+import akka.persistence.fsm.PersistentFSM.FSMState
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
-import gwi.s8.DagFSM._
 import gwi.s8.DagState.DagStateEvent
 
-import concurrent.ExecutionContext.Implicits
-import math.Ordering
-import reflect.ClassTag
+import scala.concurrent.ExecutionContext.Implicits
+import scala.math.Ordering
+import scala.reflect.ClassTag
 
 class DagFSM(
         init: () => List[(DagVertex, List[DagPartition])],
@@ -17,6 +16,7 @@ class DagFSM(
       )(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex])
   extends PersistentFSM[FSMState, DagState, DagStateEvent] with LoggingPersistentFSM[FSMState, DagState, DagStateEvent] with ActorLogging {
   import DagState._
+  import DagFSM._
 
   override def logDepth = 100
   override def persistenceId: String = self.path.toStringWithoutAddress
@@ -29,7 +29,7 @@ class DagFSM(
       checkOpt.map { check =>
         log.info(s"Scheduling partitions check : $cmd")
         context.system.scheduler.schedule(
-          check.interval, check.delay, handler, Issued(cmd, stateName, currentState, getLog)
+          check.interval, check.delay, handler, out.Issued(cmd, currentState.vertexStatesByPartition, currentState.depsInFlight)
         )(Implicits.global, self)
       }
 
@@ -49,25 +49,35 @@ class DagFSM(
 
   when(Saturating) {
     case Event(c@in.AckSaturation(dep, succeeded), _) =>
-      goto(Saturating) applying (DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
+      goto(Saturating)
+        .applying(DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent)
+        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(c@in.InsertPartitions(newPartitions), _) =>
-      goto(Saturating) applying (PartitionInsertsEvent(newPartitions), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
+      goto(Saturating)
+        .applying(PartitionInsertsEvent(newPartitions), SaturationInitializedEvent)
+        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(c@in.UpdatePartitions(updatedPartitions), _) =>
-      goto(Saturating) applying (PartitionUpdatesEvent(updatedPartitions), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
+      goto(Saturating)
+        .applying(PartitionUpdatesEvent(updatedPartitions), SaturationInitializedEvent)
+        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(c@in.RedoDagBranch(partition, vertex), _) =>
-      goto(Saturating) applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
+      goto(Saturating)
+        .applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent)
+        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(c@in.FixPartition(partition), _) =>
-      goto(Saturating) applying (PartitionFixEvent(partition), SaturationInitializedEvent) replying Submitted(c, stateName, stateData, getLog)
+      goto(Saturating)
+        .applying(PartitionFixEvent(partition), SaturationInitializedEvent)
+        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(in.GetState, stateData) =>
-      stay() replying Submitted(in.GetState, stateName, stateData, getLog)
+      stay() replying in.Submitted(in.GetState, stateData.vertexStatesByPartition, stateData.depsInFlight)
 
     case Event(in.ShutDown, _) =>
-      stop() replying Submitted(in.ShutDown, stateName, stateData, getLog)
+      stop() replying in.Submitted(in.ShutDown, stateData.vertexStatesByPartition, stateData.depsInFlight)
   }
 
   onTransition {
@@ -82,15 +92,15 @@ class DagFSM(
     case x -> Saturating =>
       if (x == DagEmpty) {
         log.info(s"Dag initialized ...")
-        handler ! Issued(out.Initialized, stateName, nextStateData, getLog)
+        handler ! out.Issued(out.Initialized, nextStateData.vertexStatesByPartition, nextStateData.depsInFlight)
       }
       val deps = nextStateData.getNewProgressingDeps
       if (deps.nonEmpty) {
         log.info(s"Saturating ${deps.size} dependencies ...")
-        deps.foreach( dep => handler ! Issued(out.Saturate(dep), stateName, nextStateData, getLog) )
+        deps.foreach( dep => handler ! out.Issued(out.Saturate(dep), nextStateData.vertexStatesByPartition, nextStateData.depsInFlight) )
       } else if (nextStateData.isSaturated) {
         log.info(s"Dag is fully saturated ...")
-        handler ! Issued(out.Saturated, stateName, nextStateData, getLog)
+        handler ! out.Issued(out.Saturated, nextStateData.vertexStatesByPartition, nextStateData.depsInFlight)
       }
   }
 
@@ -110,15 +120,6 @@ class DagFSM(
 object DagFSM {
   protected[s8] case object DagEmpty extends FSMState { override def identifier: String = "Empty" }
   protected[s8] case object Saturating extends FSMState { override def identifier: String = "Saturating" }
-
-  sealed trait CmdContainer[T <: S8Msg] {
-    def cmd: T
-    def status: FSMState
-    def state: DagState
-    def log: IndexedSeq[LogEntry[FSMState, DagState]]
-  }
-  case class Submitted(cmd: in.S8IncomingMsg, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[in.S8IncomingMsg]
-  case class Issued(cmd: out.S8OutMsg, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[out.S8OutMsg]
 
   def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, schedule: Schedule, name: String)
            (implicit arf: ActorRefFactory, edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): ActorRef = {

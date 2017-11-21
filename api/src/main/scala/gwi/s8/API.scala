@@ -1,6 +1,6 @@
 package gwi.s8
 
-import collection.immutable.{SortedSet, TreeSet}
+import collection.immutable.{SortedSet, TreeMap, TreeSet}
 import math.Ordering
 import scala.concurrent.duration._
 
@@ -69,6 +69,12 @@ trait S8LauncherSupport {
 sealed trait S8Msg
 sealed trait S8Cmd extends S8Msg
 
+sealed trait CmdContainer[T <: S8Msg] {
+  def cmd: T
+  def vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]]
+  def depsInFlight: Set[Dependency]
+}
+
 private[s8] sealed trait S8InternalCmd extends S8Cmd
 private[s8] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends S8InternalCmd
 
@@ -77,6 +83,8 @@ object in {
   sealed trait S8InSysCmd extends S8IncomingMsg
   sealed trait S8InAppCmd extends S8IncomingMsg
   sealed trait S8InBulkCmd extends S8IncomingMsg
+
+  case class Submitted(cmd: S8IncomingMsg, vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends CmdContainer[S8IncomingMsg]
 
   case object GetState extends S8InSysCmd
   case object ShutDown extends S8InSysCmd
@@ -97,6 +105,8 @@ object out {
   sealed trait S8OutMsg extends S8Msg
   sealed trait S8OutCmd extends S8OutMsg
   sealed trait S8OutInfo extends S8OutMsg
+
+  case class Issued(cmd: S8OutMsg, vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends CmdContainer[S8OutMsg]
 
   case object Saturated extends S8OutInfo
   case object Initialized extends S8OutInfo

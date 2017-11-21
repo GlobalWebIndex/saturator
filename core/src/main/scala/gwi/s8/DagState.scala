@@ -90,7 +90,7 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
   }
 
   def getRoot: DagVertex = dag.root
-  def getVertexStatesByPartition: Map[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
+  def getVertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]] = vertexStatesByPartition
   def isSaturated: Boolean = vertexStatesByPartition.values.forall { vertexStates =>
     vertexStates(dag.root) == Complete && dag.descendantsOfRoot(v => vertexStates(v) != Failed).forall(v => vertexStates(v) == Complete)
   }
