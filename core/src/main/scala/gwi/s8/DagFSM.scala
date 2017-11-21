@@ -25,7 +25,7 @@ class DagFSM(
   log.info(s"Starting DagFSM with persistence id $persistenceId ...")
 
   private[this] def schedulePartitionCheck(currentState: DagState): List[Cancellable] = {
-    def scheduleCheck(checkOpt: Option[PartitionCheck], cmd: out.S8OutgoingCmd): Option[Cancellable] =
+    def scheduleCheck(checkOpt: Option[PartitionCheck], cmd: out.S8OutCmd): Option[Cancellable] =
       checkOpt.map { check =>
         log.info(s"Scheduling partitions check : $cmd")
         context.system.scheduler.schedule(
@@ -118,7 +118,7 @@ object DagFSM {
     def log: IndexedSeq[LogEntry[FSMState, DagState]]
   }
   case class Submitted(cmd: in.S8IncomingMsg, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[in.S8IncomingMsg]
-  case class Issued(cmd: out.S8OutgoingMsg, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[out.S8OutgoingMsg]
+  case class Issued(cmd: out.S8OutMsg, status: FSMState, state: DagState, log: IndexedSeq[LogEntry[FSMState, DagState]]) extends CmdContainer[out.S8OutMsg]
 
   def apply(init: => List[(DagVertex, List[DagPartition])], handler: ActorRef, schedule: Schedule, name: String)
            (implicit arf: ActorRefFactory, edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]): ActorRef = {

@@ -2,7 +2,7 @@ package gwi.s8
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import gwi.s8.DagFSM._
+import gwi.s8.DagFSM.Issued
 import org.backuity.clist._
 import org.backuity.clist.util.Read
 
