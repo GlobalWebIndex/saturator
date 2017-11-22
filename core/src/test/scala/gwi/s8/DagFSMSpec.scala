@@ -25,7 +25,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     probe.expectMsgType[out.Issued] match {
       case out.Issued(out.Saturate(dep),_,_) if expectedDepOpt.isEmpty || expectedDepOpt.contains(dep) =>
         fsmActor ! in.AckSaturation(dep, !failedDep.contains(dep))
-        expectMsgType[in.Submitted]
+        expectMsgType[out.Submitted]
         dep
       case x =>
         sys.error(s"Unexpected message $x")
@@ -56,21 +56,21 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     // saturation after adding new partition
 
     fsmActor ! in.InsertPartitions(TreeSet(2L))
-    expectMsgType[in.Submitted]
+    expectMsgType[out.Submitted]
 
     assertSaturationOfDagForPartition(2L)
 
     // saturation after changing existing partition
 
     fsmActor ! in.UpdatePartitions(TreeSet(2L))
-    expectMsgType[in.Submitted]
+    expectMsgType[out.Submitted]
 
     assertSaturationOfDagForPartition(2L)
 
     // saturation after redoing a dag branch
 
     fsmActor ! in.RedoDagBranch(2L, 2)
-    expectMsgType[in.Submitted]
+    expectMsgType[out.Submitted]
 
     handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, TreeSet(1), 2)))
     handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, TreeSet(3,2), 6)))
@@ -79,7 +79,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     // saturation after recreating a partition
 
     fsmActor ! in.RedoDagBranch(2L, 1)
-    expectMsgType[in.Submitted]
+    expectMsgType[out.Submitted]
 
     assertSaturationOfDagForPartition(2L)
 
@@ -87,14 +87,14 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
     (3L to 10L) foreach { p =>
       fsmActor ! in.InsertPartitions(TreeSet(p))
-      expectMsgType[in.Submitted]
+      expectMsgType[out.Submitted]
       assertSaturationOfDagForPartition(p)
     }
 
     // shutdown command
 
     fsmActor ! in.ShutDown
-    expectMsgType[in.Submitted] match { case (in.Submitted(cmd, vertexStatesByPartition, depsInFlight)) =>
+    expectMsgType[out.Submitted] match { case (out.Submitted(cmd, vertexStatesByPartition, depsInFlight)) =>
       assertResult(in.ShutDown)(cmd)
       assert(vertexStatesByPartition.size == 10)
       assert(depsInFlight.isEmpty)
@@ -105,7 +105,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     val newFsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "test-dag-fsm")
 
     newFsmActor ! in.ShutDown
-    expectMsgType[in.Submitted] match { case (in.Submitted(cmd, vertexStatesByPartition, depsInFlight)) =>
+    expectMsgType[out.Submitted] match { case (out.Submitted(cmd, vertexStatesByPartition, depsInFlight)) =>
       assert(vertexStatesByPartition.size == 10)
       assert(depsInFlight.isEmpty)
     }
@@ -130,7 +130,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     assertSaturationOfDagForPartition(1L)
 
     fsmActor ! in.FixPartition(1L)
-    expectMsgType[in.Submitted]
+    expectMsgType[out.Submitted]
 
     handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, TreeSet(1), 2)))
     handleIssuedCmd(probe, fsmActor, None, Some(Dependency(1L, TreeSet(3,2), 6)))
@@ -166,7 +166,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     }
 
     fsmActor ! in.ShutDown
-    expectMsgType[in.Submitted] match { case (in.Submitted(cmd, vertexStatesByPartition, depsInFlight)) =>
+    expectMsgType[out.Submitted] match { case (out.Submitted(cmd, vertexStatesByPartition, depsInFlight)) =>
       assert(vertexStatesByPartition.size == 9)
       assert(depsInFlight.isEmpty)
     }

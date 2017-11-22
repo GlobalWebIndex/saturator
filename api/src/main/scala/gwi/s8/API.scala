@@ -84,8 +84,6 @@ object in {
   sealed trait S8InAppCmd extends S8IncomingMsg
   sealed trait S8InBulkCmd extends S8IncomingMsg
 
-  case class Submitted(cmd: S8IncomingMsg, vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends CmdContainer[S8IncomingMsg]
-
   case object GetState extends S8InSysCmd
   case object ShutDown extends S8InSysCmd
 
@@ -107,6 +105,7 @@ object out {
   sealed trait S8OutInfo extends S8OutMsg
 
   case class Issued(cmd: S8OutMsg, vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends CmdContainer[S8OutMsg]
+  case class Submitted(cmd: in.S8IncomingMsg, vertexStatesByPartition: TreeMap[DagPartition, Map[DagVertex, String]], depsInFlight: Set[Dependency]) extends CmdContainer[in.S8IncomingMsg]
 
   case object Saturated extends S8OutInfo
   case object Initialized extends S8OutInfo

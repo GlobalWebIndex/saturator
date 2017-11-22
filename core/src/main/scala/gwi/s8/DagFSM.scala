@@ -51,33 +51,39 @@ class DagFSM(
     case Event(c@in.AckSaturation(dep, succeeded), _) =>
       goto(Saturating)
         .applying(DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent)
-        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
-    case Event(c@in.InsertPartitions(newPartitions), _) =>
+    case Event(in.InsertPartitions(newPartitions), _) =>
+      val (existingPartitions, nonExistingPartitions) = newPartitions.partition(stateData.vertexStatesByPartition.contains)
+      if (existingPartitions.nonEmpty)
+        log.warning(s"Idempotently not inserting partitions that already exist ${existingPartitions.mkString("\n","\n","\n")}")
       goto(Saturating)
-        .applying(PartitionInsertsEvent(newPartitions), SaturationInitializedEvent)
-        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .applying(PartitionInsertsEvent(nonExistingPartitions), SaturationInitializedEvent)
+        .replying(out.Submitted(in.InsertPartitions(nonExistingPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
 
-    case Event(c@in.UpdatePartitions(updatedPartitions), _) =>
+    case Event(in.UpdatePartitions(updatedPartitions), _) =>
+      val (existingPartitions, nonExistingPartitions) = updatedPartitions.partition(stateData.vertexStatesByPartition.contains)
+      if (nonExistingPartitions.nonEmpty)
+        log.error(s"Ignoring update of partitions that do not exist ${nonExistingPartitions.mkString("\n","\n","\n")}")
       goto(Saturating)
-        .applying(PartitionUpdatesEvent(updatedPartitions), SaturationInitializedEvent)
-        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .applying(PartitionUpdatesEvent(existingPartitions), SaturationInitializedEvent)
+        .replying(out.Submitted(in.UpdatePartitions(existingPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(c@in.RedoDagBranch(partition, vertex), _) =>
       goto(Saturating)
         .applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent)
-        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(c@in.FixPartition(partition), _) =>
       goto(Saturating)
         .applying(PartitionFixEvent(partition), SaturationInitializedEvent)
-        .replying(in.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(in.GetState, stateData) =>
-      stay() replying in.Submitted(in.GetState, stateData.vertexStatesByPartition, stateData.depsInFlight)
+      stay() replying out.Submitted(in.GetState, stateData.vertexStatesByPartition, stateData.depsInFlight)
 
     case Event(in.ShutDown, _) =>
-      stop() replying in.Submitted(in.ShutDown, stateData.vertexStatesByPartition, stateData.depsInFlight)
+      stop() replying out.Submitted(in.ShutDown, stateData.vertexStatesByPartition, stateData.depsInFlight)
   }
 
   onTransition {

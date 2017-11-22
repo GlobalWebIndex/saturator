@@ -141,7 +141,8 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
     case PartitionInsertsEvent(partitions) =>
       val rootVertex = dag.root
       val partitionStateByVertex = dag.allVertices.map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
-      logger.info(s"Partitions created : ${partitions.mkString("\n","\n","\n")}")
+      if (partitions.nonEmpty)
+        logger.info(s"Partitions created : ${partitions.mkString("\n","\n","\n")}")
       copy(vertexStatesByPartition = vertexStatesByPartition ++ partitions.map(_ -> partitionStateByVertex))
 
     case PartitionUpdatesEvent(partitions) =>
@@ -151,7 +152,8 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
         partitions
           .collect { case p if vertexStatesByPartition.contains(p) => p -> vertexStatesByPartition(p) }
           .flatMap { case (p, states) => redoPartitionBranch(p, rootVertex, states).map(p -> _) }
-      logger.info(s"Partitions changed : ${partitions.mkString("\n","\n","\n")}")
+      if (changedStatesByPartition.nonEmpty)
+        logger.info(s"Partitions changed : ${partitions.mkString("\n","\n","\n")}")
       copy(vertexStatesByPartition = vertexStatesByPartition ++ changedStatesByPartition)
 
     case DagBranchRedoEvent(p, vertex) =>
