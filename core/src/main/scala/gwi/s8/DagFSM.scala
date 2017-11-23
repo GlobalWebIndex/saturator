@@ -27,10 +27,9 @@ class DagFSM(
   private[this] def schedulePartitionCheck(currentState: DagState): List[Cancellable] = {
     def scheduleCheck(checkOpt: Option[PartitionCheck], cmd: out.S8OutCmd): Option[Cancellable] =
       checkOpt.map { check =>
-        log.info(s"Scheduling partitions check : $cmd")
         context.system.scheduler.schedule(
-          check.interval, check.delay, handler, out.Issued(cmd, currentState.vertexStatesByPartition, currentState.depsInFlight)
-        )(Implicits.global, self)
+          check.interval, check.delay, self, system.Submit(cmd)
+        )(Implicits.global, handler)
       }
 
     val Schedule(createdCheckOpt, changedCheckOpt) = schedule
@@ -43,7 +42,7 @@ class DagFSM(
   startWith(DagEmpty, DagState.empty)
 
   when(DagEmpty) {
-    case Event(Initialize(partitionsByVertex), _) =>
+    case Event(system.Initialize(partitionsByVertex), _) =>
       goto(Saturating) applying (StateInitializedEvent(partitionsByVertex), SaturationInitializedEvent)
   }
 
@@ -84,13 +83,16 @@ class DagFSM(
 
     case Event(in.ShutDown, _) =>
       stop() replying out.Submitted(in.ShutDown, stateData.vertexStatesByPartition, stateData.depsInFlight)
+
+    case Event(system.Submit(cmd), _) =>
+      stay() replying out.Issued(cmd, stateData.vertexStatesByPartition, stateData.depsInFlight)
   }
 
   onTransition {
     case DagEmpty -> DagEmpty if nextStateData.getVertexStatesByPartition.isEmpty => // Initialization happens only on fresh start, not when persistent event log is replayed
       log.info("Starting FSM, DAG created, initializing ...")
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
-      self ! Initialize(initialData)
+      self ! system.Initialize(initialData)
       schedulePartitionCheck(nextStateData)
     case DagEmpty -> DagEmpty =>
       log.info("Starting FSM, DAG already exists ...")

@@ -75,8 +75,11 @@ sealed trait CmdContainer[T <: S8Msg] {
   def depsInFlight: Set[Dependency]
 }
 
-private[s8] sealed trait S8InternalCmd extends S8Cmd
-private[s8] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends S8InternalCmd
+private[s8] object system {
+  private[s8] sealed trait S8InternalCmd extends S8Cmd
+  private[s8] case class Initialize(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends S8InternalCmd
+  private[s8] case class Submit(cmd: out.S8OutCmd) extends S8InternalCmd
+}
 
 object in {
   sealed trait S8IncomingMsg extends S8Msg
