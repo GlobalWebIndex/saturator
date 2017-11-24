@@ -53,20 +53,14 @@ class DagFSM(
         .replying(out.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(in.InsertPartitions(newPartitions), _) =>
-      val (existingPartitions, nonExistingPartitions) = newPartitions.partition(stateData.vertexStatesByPartition.contains)
-      if (existingPartitions.nonEmpty)
-        log.warning(s"Idempotently not inserting partitions that already exist ${existingPartitions.mkString("\n","\n","\n")}")
       goto(Saturating)
-        .applying(PartitionInsertsEvent(nonExistingPartitions), SaturationInitializedEvent)
-        .replying(out.Submitted(in.InsertPartitions(nonExistingPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .applying(PartitionInsertsEvent(newPartitions), SaturationInitializedEvent)
+        .replying(out.Submitted(in.InsertPartitions(newPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(in.UpdatePartitions(updatedPartitions), _) =>
-      val (existingPartitions, nonExistingPartitions) = updatedPartitions.partition(stateData.vertexStatesByPartition.contains)
-      if (nonExistingPartitions.nonEmpty)
-        log.error(s"Ignoring update of partitions that do not exist ${nonExistingPartitions.mkString("\n","\n","\n")}")
       goto(Saturating)
-        .applying(PartitionUpdatesEvent(existingPartitions), SaturationInitializedEvent)
-        .replying(out.Submitted(in.UpdatePartitions(existingPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .applying(PartitionUpdatesEvent(updatedPartitions), SaturationInitializedEvent)
+        .replying(out.Submitted(in.UpdatePartitions(updatedPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
 
     case Event(c@in.RedoDagBranch(partition, vertex), _) =>
       goto(Saturating)

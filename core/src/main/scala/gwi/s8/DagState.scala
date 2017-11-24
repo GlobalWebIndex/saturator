@@ -66,13 +66,12 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       }.toSeq:_*
     )
 
-  private[this] def saturationSanityCheck(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex): Unit = {
+  private[this] def depSaturationSanityCheck(p: DagPartition, sourceVertices: Set[DagVertex], targetVertex: DagVertex): Unit = {
     val neighborDescendants = dag.neighborDescendantsOf(targetVertex)
     val partitionStateByVertex = vertexStatesByPartition(p)
-    require(
-      sourceVertices.forall(partitionStateByVertex(_) == Complete) && partitionStateByVertex(targetVertex) == InProgress && partitionStateByVertex.filterKeys(neighborDescendants.contains).forall(_._2 == Pending),
-      s"Illegal inProgressToComplete state of $p from $sourceVertices to $targetVertex:\n${mkString(p).get}"
-    )
+    require(sourceVertices.forall(partitionStateByVertex(_) == Complete), s"Illegal saturation from inComplete vertex\n $p from $sourceVertices to $targetVertex:\n${mkString(p).get}")
+    require(partitionStateByVertex(targetVertex) == InProgress, s"Illegal saturation of not progressing vertex\n $p from $sourceVertices to $targetVertex:\n${mkString(p).get}")
+    require(partitionStateByVertex.filterKeys(neighborDescendants.contains).forall(_._2 == Pending), s"Dep saturated with target descendants not pending\n $p from $sourceVertices to $targetVertex:\n${mkString(p).get}")
   }
 
   private[this] def redoPartitionBranch(p: DagPartition, vertex: DagVertex, partitionStateByVertex: Map[DagVertex, String]): Option[Map[DagVertex, String]] = {
@@ -127,33 +126,31 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
       copy(vertexStatesByPartition = newStates, depsInFlight = depsInFlight ++ getNewProgressingDeps)
 
     case SaturationSucceededEvent(dep@Dependency(p, sourceVertices, targetVertex)) =>
-      saturationSanityCheck(p, sourceVertices, targetVertex)
+      depSaturationSanityCheck(p, sourceVertices, targetVertex)
       val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Complete)), depsInFlight = depsInFlight - dep)
       logger.info(s"Saturation of dependency succeeded : $dep\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
       newState
 
     case SaturationFailedEvent(dep@Dependency(p, sourceVertices, targetVertex)) =>
-      saturationSanityCheck(p, sourceVertices, targetVertex)
+      depSaturationSanityCheck(p, sourceVertices, targetVertex)
       val newState = copy(vertexStatesByPartition = vertexStatesByPartition.adjust(p)(_.updated(targetVertex, Failed)), depsInFlight = depsInFlight - dep)
       logger.info(s"Saturation of dependency failed : $dep\n${mkString(p).get}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.mkString(p).get}")
       newState
 
-    case PartitionInsertsEvent(partitions) =>
+    case PartitionInsertsEvent(newPartitions) =>
+      val (existingPartitions, nonExistingPartitions) = newPartitions.partition(vertexStatesByPartition.contains)
       val rootVertex = dag.root
       val partitionStateByVertex = dag.allVertices.map(v => v -> (if (v == rootVertex) Complete else Pending)).toMap
-      if (partitions.nonEmpty)
-        logger.info(s"Partitions created : ${partitions.mkString("\n","\n","\n")}")
-      copy(vertexStatesByPartition = vertexStatesByPartition ++ partitions.map(_ -> partitionStateByVertex))
+      existingPartitions.foreach( p => logger.warn(s"Idempotently not inserting partition that already exist : $p") )
+      nonExistingPartitions.foreach( p => logger.info(s"Partition created : $p"))
+      copy(vertexStatesByPartition = vertexStatesByPartition ++ nonExistingPartitions.map(_ -> partitionStateByVertex))
 
-    case PartitionUpdatesEvent(partitions) =>
+    case PartitionUpdatesEvent(updatedPartitions) =>
+      val (existingPartitions, nonExistingPartitions) = updatedPartitions.partition(vertexStatesByPartition.contains) // updated partition should not be progressing
       val rootVertex = dag.root
-      partitions.filter(vertexStatesByPartition.contains).foreach( p => logger.error(s"Partition $p cannot be changed because it is missing !!!") )
-      val changedStatesByPartition =
-        partitions
-          .collect { case p if vertexStatesByPartition.contains(p) => p -> vertexStatesByPartition(p) }
-          .flatMap { case (p, states) => redoPartitionBranch(p, rootVertex, states).map(p -> _) }
-      if (changedStatesByPartition.nonEmpty)
-        logger.info(s"Partitions changed : ${partitions.mkString("\n","\n","\n")}")
+      nonExistingPartitions.foreach( p => logger.error(s"Partition cannot be changed because it is missing : $p") )
+      existingPartitions.foreach( p => logger.error(s"Partition changed : $p") )
+      val changedStatesByPartition = existingPartitions.flatMap { p => redoPartitionBranch(p, rootVertex, vertexStatesByPartition(p)).map(p -> _) }
       copy(vertexStatesByPartition = vertexStatesByPartition ++ changedStatesByPartition)
 
     case DagBranchRedoEvent(p, vertex) =>
