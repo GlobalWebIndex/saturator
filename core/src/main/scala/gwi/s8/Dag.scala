@@ -44,4 +44,7 @@ protected[s8] case class Dag[V](edges: Set[(V,V)])(implicit vo: Ordering[V]) {
   def families: Set[(Set[V],V)] =
     edges.groupBy(_._2).mapValues(_.map(_._1)).toSet[(V,Set[V])].map { case (target, sources) => sources -> target }
 
+  def meAndMyDescendantsUnlessRoot(v: V): SortedSet[V] = descendantsOf(v)() ++ Option(v).filter(_ != root)
+  def meAndMyAncestors(v: V): SortedSet[V] = ancestorsOf(v) + v
+
 }

@@ -75,7 +75,7 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
   }
 
   private[this] def redoPartitionBranch(p: DagPartition, vertex: DagVertex, partitionStateByVertex: Map[DagVertex, String]): Option[Map[DagVertex, String]] = {
-    val branch = dag.descendantsOf(vertex)() ++ Option(vertex).filter(_ != dag.root)
+    val branch = dag.meAndMyDescendantsUnlessRoot(vertex)
     val branchStates = branch.map(partitionStateByVertex)
     val ancestorStates = dag.ancestorsOf(vertex).map(partitionStateByVertex)
     if (branchStates.contains(InProgress)) {
@@ -106,7 +106,7 @@ case class DagState private(vertexStatesByPartition: TreeMap[DagPartition, Map[D
         logger.warn(alienPartitionsError(vertexPartitions, rootVertexPartitions))
 
       def buildGraphForPartition(p: DagPartition, vertex: DagVertex): Map[DagVertex, String] = {
-        def isComplete = (dag.ancestorsOf(vertex) + vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
+        def isComplete = dag.meAndMyAncestors(vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
         val state = if (vertex == rootVertex || isComplete) Complete else Pending
         dag.neighborDescendantsOf(vertex).flatMap(buildGraphForPartition(p, _)).toMap + (vertex -> state)
       }
