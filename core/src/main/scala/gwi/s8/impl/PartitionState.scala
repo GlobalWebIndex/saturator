@@ -27,24 +27,19 @@ private[impl] object PartitionState extends StrictLogging {
   }
 
   private[impl] implicit class PartitionStatePimp(underlying: PartitionState)(implicit dag: Dag[DagVertex], vo: Ordering[DagVertex]) {
-    private[this] def collectSaturationErrors(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): List[String] = {
-      val neighborDescendants = dag.neighborDescendantsOf(targetVertex)
-      List(
-        Option(sourceVertices.forall(underlying(_) == Complete)).filterNot(identity).map(_ => "Illegal saturation from inComplete vertex"),
-        Option(underlying(targetVertex) == InProgress).filterNot(identity).map(_ => "Illegal saturation of not progressing vertex"),
-        Option(underlying.filterKeys(neighborDescendants.contains).forall(_._2 == Pending)).filterNot(identity).map(_ => "Dep saturated with target descendants not pending")
-      ).flatten
+    private[this] def collectErrors(result: => PartitionState)(condError: (Boolean, String)*): Either[String, PartitionState] = {
+      val errors = condError.flatMap { case (cond, error) => Option(cond).filterNot(identity).map(_ => error) }
+      if (errors.isEmpty)
+        Right(result)
+      else
+        Left(errors.mkString("\n","\n","\n"))
     }
 
     private[impl] def fix: Either[String, PartitionState] = {
       val rootVertex = dag.root
       val rootDescendants = dag.descendantsOf(rootVertex)()
-      if (!rootDescendants.map(underlying).contains(InProgress)) {
-        val newState = underlying ++ rootDescendants.filter(underlying(_) == Failed).map(_ -> Pending)
-        logger.info(s"\n$printable\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.printable}")
-        Right(newState)
-      } else {
-        Left(s"Fixing progressing partition is not allowed !!!\n $printable")
+      collectErrors(underlying ++ rootDescendants.filter(underlying(_) == Failed).map(_ -> Pending)) {
+        !rootDescendants.map(underlying).contains(InProgress) -> s"Fixing progressing partition is not allowed !!!"
       }
     }
 
@@ -52,52 +47,31 @@ private[impl] object PartitionState extends StrictLogging {
       val branch = dag.meAndMyDescendantsUnlessRoot(vertex)
       val branchStates = branch.map(underlying)
       val ancestorStates = dag.ancestorsOf(vertex).map(underlying)
-      if (branchStates.contains(InProgress)) {
-        Left(s"Redoing dag branch of $vertex in progressing partition is not allowed !!!\n $printable")
-      } else if (!ancestorStates.forall(_ == Complete)){
-        Left(s"Dag branch cannot be redone in vertex $vertex from incomplete ancestors !!!\n $printable")
-      } else {
-        val newState = underlying ++ branch.map(_ -> Pending)
-        logger.info(s"\n$printable\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.printable}")
-        Right(underlying ++ branch.map(_ -> Pending))
-      }
+      collectErrors(underlying ++ branch.map(_ -> Pending)) (
+        !branchStates.contains(InProgress) -> s"Redoing dag branch of $vertex in progressing partition is not allowed !!!",
+        ancestorStates.forall(_ == Complete) -> s"Dag branch cannot be redone in vertex $vertex from incomplete ancestors !!!"
+      )
     }
 
-    // TODO look at errors and decide what to do with DAG
-    private[impl] def fail(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] = {
-      val errors = collectSaturationErrors(sourceVertices, targetVertex)
-      if (errors.nonEmpty) {
-        Left(s"${errors.mkString("\n","\n","\n")}$printable")
-      } else {
-        val newState = underlying.updated(targetVertex, Failed)
-        logger.info(s"\n$printable\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.printable}")
-        Right(newState)
-      }
-    }
+    private[impl] def fail(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] =
+      collectErrors(underlying.updated(targetVertex, Failed))(
+        sourceVertices.forall(underlying(_) == Complete) -> "Illegal saturation from inComplete vertex",
+        (underlying(targetVertex) == InProgress) -> "Illegal saturation of not progressing vertex",
+        underlying.filterKeys(dag.neighborDescendantsOf(targetVertex).contains).forall(_._2 == Pending) -> "Dep saturated with target descendants not pending"
+      )
 
-    // TODO look at errors and decide what to do with DAG
-    private[impl] def succeed(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] = {
-      val errors = collectSaturationErrors(sourceVertices, targetVertex)
-      if (errors.nonEmpty) {
-        Left(s"${errors.mkString("\n","\n","\n")}$printable")
-      } else {
-        val newState = underlying.updated(targetVertex, Complete)
-        logger.info(s"\n$printable\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.printable}")
-        Right(newState)
-      }
-    }
+    private[impl] def succeed(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] =
+      collectErrors(underlying.updated(targetVertex, Complete)) (
+        sourceVertices.forall(underlying(_) == Complete) -> "Illegal saturation from inComplete vertex",
+        (underlying(targetVertex) == InProgress) -> "Illegal saturation of not progressing vertex",
+        underlying.filterKeys(dag.neighborDescendantsOf(targetVertex).contains).forall(_._2 == Pending) -> "Dep saturated with target descendants not pending"
+      )
 
-    // TODO look at errors and decide what to do with DAG
     private[impl] def progress(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] =
-      if (underlying(targetVertex) != Pending) {
-        Left(s"Progressing vertex $targetVertex is not Pending !!! \n$printable")
-      } else if (sourceVertices.forall(underlying(_) != Complete)) {
-        Left(s"Vertex $targetVertex cannot progress from incomplete vertices !!! \n$printable")
-      } else {
-        val newState = underlying.updated(targetVertex, InProgress)
-        logger.info(s"\n$printable\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newState.printable}")
-        Right(newState)
-      }
+      collectErrors(underlying.updated(targetVertex, InProgress)) (
+        (underlying(targetVertex) == Pending) -> s"Progressing vertex $targetVertex is not Pending !!!",
+        sourceVertices.forall(underlying(_) == Complete) -> s"Vertex $targetVertex cannot progress from incomplete vertices !!!"
+      )
 
     private[impl] def isSaturated: Boolean =
       underlying(dag.root) == Complete && dag.descendantsOfRoot(v => underlying(v) != Failed).forall(v => underlying(v) == Complete)

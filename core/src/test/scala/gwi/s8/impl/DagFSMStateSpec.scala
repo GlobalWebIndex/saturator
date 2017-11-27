@@ -5,6 +5,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpec, Matchers}
 
 import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.language.implicitConversions
 
 class DagFSMStateSpec extends FreeSpec with DagTestSupport with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
   import gwi.s8.impl.PartitionState._

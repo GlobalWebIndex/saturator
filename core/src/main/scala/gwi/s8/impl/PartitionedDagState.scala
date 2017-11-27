@@ -27,6 +27,21 @@ private[impl] object PartitionedDagState extends StrictLogging {
 
   private[impl] implicit class PartitionedDagStatePimp(underlying: PartitionedDagState)(implicit dag: Dag[DagVertex], po: Ordering[DagPartition], vo: Ordering[DagVertex]) {
 
+    private[impl] def handlePartitionOp(opName: String, p: DagPartition)(f: PartitionState => Either[String, PartitionState]): PartitionedDagState = underlying.get(p) match {
+      case None =>
+        logger.error(s"Operation '$opName' on partition $p failed because it doesn't exist !!!")
+        underlying
+      case Some(ps) =>
+        f(ps) match {
+          case Left(error) =>
+            logger.error(s"Operation '$opName' on partition $p failed due to : $error \n${ps.printable}")
+            underlying // TODO could we do something else than ignore it?
+          case Right(newPs) =>
+            logger.info(s"Operation '$opName' on partition $p succeeded\n${ps.printable}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newPs.printable}")
+            underlying updated(p, newPs)
+        }
+    }
+
     private[impl] def addPartitions(partitions: TreeSet[DagPartition]): PartitionedDagState = {
       val (existingPartitions, nonExistingPartitions) = partitions.partition(underlying.contains)
       val partitionState = PartitionState()
@@ -53,73 +68,20 @@ private[impl] object PartitionedDagState extends StrictLogging {
     }
 
     private[impl] def redo(p: DagPartition, v: DagVertex): PartitionedDagState =
-      underlying.flatAdjust(p) {
-        case None =>
-          logger.error(s"Redoing $v of partition $p that doesn't exist !!!")
-          None
-        case Some(partitionState) =>
-          partitionState.redo(v) match {
-            case Left(error) =>
-              logger.error(s"Redoing partition $p failed because : $error")
-              None
-            case Right(ps) =>
-              logger.info(s"Partition redoing succeeded $p")
-              Some(ps)
-          }
-      }
+      handlePartitionOp("redo", p)(_.redo(v))
 
     private[impl] def fix(p: DagPartition): PartitionedDagState =
-      underlying.adjust(p) { partitionState =>
-        partitionState.fix match {
-          case Left(error) =>
-            logger.info(s"Partition $p cannot be fixed due to $error")
-            partitionState
-          case Right(ps) =>
-            logger.info(s"Partition fixing succeeded $p")
-            ps
-        }
-      }
+      handlePartitionOp("fix", p)(_.fix)
 
-    private[impl] def fail(dep: Dependency): PartitionedDagState = dep match {
-      case Dependency(p, sourceVertices, targetVertex) =>
-        underlying.adjust(p) { partitionState =>
-          partitionState.fail(sourceVertices, targetVertex) match {
-            case Left(error) =>
-              logger.info(s"Partition $p cannot be failed due to $error")
-              partitionState
-            case Right(ps) =>
-              logger.info(s"Partition failing succeeded $p")
-              ps
-          }
-        }
-    }
+    private[impl] def fail(dep: Dependency): PartitionedDagState =
+      handlePartitionOp("fail", dep.p)(_.fail(dep.sourceVertices, dep.targetVertex))
 
-    private[impl] def succeed(dep: Dependency): PartitionedDagState = dep match {
-      case Dependency(p, sourceVertices, targetVertex) =>
-        underlying.adjust(p) { partitionState =>
-          partitionState.succeed(sourceVertices, targetVertex) match {
-            case Left(error) =>
-              logger.info(s"Partition $p cannot be succeeded due to $error")
-              partitionState
-            case Right(ps) =>
-              logger.info(s"Partition succeeding succeeded $p")
-              ps
-          }
-        }
-    }
+    private[impl] def succeed(dep: Dependency): PartitionedDagState =
+      handlePartitionOp("succeed", dep.p)(_.succeed(dep.sourceVertices, dep.targetVertex))
 
     private[impl] def progress: PartitionedDagState =
       getPendingDeps.foldLeft(underlying) { case (acc, Dependency(p, sourceVertices, targetVertex)) =>
-        acc.adjust(p) { partitionState =>
-          partitionState.progress(sourceVertices, targetVertex) match {
-            case Left(error) =>
-              logger.info(s"Partition $p cannot progress due to $error")
-              partitionState
-            case Right(ps) =>
-              logger.info(s"Partition progressing succeeded $p")
-              ps
-          }
-        }
+        acc.handlePartitionOp("progress", p)(_.progress(sourceVertices, targetVertex))
       }
 
     private[impl] def isSaturated: Boolean = underlying.values.forall(_.isSaturated)
