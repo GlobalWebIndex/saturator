@@ -1,6 +1,7 @@
-package gwi.s8
+package gwi.s8.impl
 
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
+import gwi.s8.{DagPartition, DagVertex, Dependency}
 
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.math.Ordering
@@ -8,6 +9,7 @@ import scala.math.Ordering
 protected[s8] case class DagFSMState(partitionedDagState: PartitionedDagState, depsInFlight: Set[Dependency])
 
 protected[s8] object DagFSMState extends StrictLogging {
+  import PartitionedDagState._
 
   protected[s8] sealed trait DagStateEvent
   protected[s8] case class StateInitializedEvent(partitionsByVertex: Map[DagVertex, Set[DagPartition]]) extends DagStateEvent
@@ -27,11 +29,10 @@ protected[s8] object DagFSMState extends StrictLogging {
 
   protected[s8] def empty(implicit po: Ordering[DagPartition]): DagFSMState =
     DagFSMState(partitionedDagState = TreeMap.empty[DagPartition, PartitionState], depsInFlight = Set.empty[Dependency])
-  protected[s8] def initialized(partitionedDagState: PartitionedDagState) =
+  private[impl] def initialized(partitionedDagState: PartitionedDagState) =
     DagFSMState(partitionedDagState, Set.empty)
 
   implicit class DagFSMStatePimp(underlying: DagFSMState)(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex]) extends LazyLogging {
-    import PartitionedDagState._
     private[this] implicit val dag = Dag(edges)
 
     protected[s8] def getRoot: DagVertex = dag.root

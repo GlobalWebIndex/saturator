@@ -1,13 +1,20 @@
-package gwi.s8
+package gwi.s8.impl
 
-import gwi.s8.DagFSMState._
+import gwi.s8.{DagPartition, DagTestSupport, DagVertex, Dependency}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpec, Matchers}
 
-import collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.{TreeMap, TreeSet}
 
-class DagStateSpec extends FreeSpec with DagTestSupport with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
-  import PartitionState._
+class DagFSMStateSpec extends FreeSpec with DagTestSupport with ScalaFutures with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
+  import gwi.s8.impl.PartitionState._
+  import gwi.s8.impl.DagFSMState._
+
+  private[this] implicit def sortedPartitionState(ps: Map[Int, String]): PartitionState =
+    TreeMap(ps.map { case (v,s) => implicitly[DagVertex](v) -> s}.toSeq:_*)
+  private[this] implicit def sortedPartitionedDagState(pds: Map[Int, TreeMap[DagVertex, String]]): PartitionedDagState =
+    TreeMap(pds.map { case (v,s) => implicitly[DagPartition](v) -> s}.toSeq:_*)
+
   private[this] implicit val edges: Set[(DagVertex, DagVertex)] =
     Set(
       1 -> 2, 2 -> 6,

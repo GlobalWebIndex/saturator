@@ -1,32 +1,33 @@
-package gwi.s8
+package gwi.s8.impl
 
 import com.github.mdr.ascii.graph.Graph
 import com.github.mdr.ascii.layout.GraphLayout
 import com.typesafe.scalalogging.StrictLogging
+import gwi.s8.{DagPartition, DagVertex}
 
 import scala.collection.breakOut
 import scala.collection.immutable.{SortedSet, TreeMap, TreeSet}
 import scala.math.Ordering
 
-object PartitionState extends StrictLogging {
+private[impl] object PartitionState extends StrictLogging {
 
-  protected[s8] val Pending     = "Pending"
-  protected[s8] val Complete    = "Complete"
-  protected[s8] val InProgress  = "InProgress"
-  protected[s8] val Failed      = "Failed"
+  private[impl] val Pending     = "Pending"
+  private[impl] val Complete    = "Complete"
+  private[impl] val InProgress  = "InProgress"
+  private[impl] val Failed      = "Failed"
 
-  def apply()(implicit dag: Dag[DagVertex], vo: Ordering[DagVertex]) =
+  private[impl] def apply()(implicit dag: Dag[DagVertex], vo: Ordering[DagVertex]) =
     TreeMap(dag.allVertices.map(v => v -> (if (v == dag.root) Complete else Pending)).toSeq:_*)
 
-  def buildGraphForPartition(p: DagPartition, vertex: DagVertex, partitionsByVertex: Map[DagVertex, Set[DagPartition]])(implicit dag: Dag[DagVertex], vo: Ordering[DagVertex]): PartitionState = {
+  private[impl] def buildGraphForPartition(p: DagPartition, vertex: DagVertex, partitionsByVertex: Map[DagVertex, Set[DagPartition]])(implicit dag: Dag[DagVertex], vo: Ordering[DagVertex]): PartitionState = {
     def isComplete = dag.meAndMyAncestors(vertex).forall(partitionsByVertex.get(_).exists(_.contains(p)))
     val state = if (vertex == dag.root || isComplete) Complete else Pending
     val partitionState = dag.neighborDescendantsOf(vertex).flatMap(buildGraphForPartition(p, _, partitionsByVertex)).toMap + (vertex -> state)
     TreeMap(partitionState.toSeq:_*)
   }
 
-  implicit class PartitionStatePimp(underlying: PartitionState)(implicit dag: Dag[DagVertex], vo: Ordering[DagVertex]) {
-    def collectSaturationErrors(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): List[String] = {
+  private[impl] implicit class PartitionStatePimp(underlying: PartitionState)(implicit dag: Dag[DagVertex], vo: Ordering[DagVertex]) {
+    private[this] def collectSaturationErrors(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): List[String] = {
       val neighborDescendants = dag.neighborDescendantsOf(targetVertex)
       List(
         Option(sourceVertices.forall(underlying(_) == Complete)).filterNot(identity).map(_ => "Illegal saturation from inComplete vertex"),
@@ -35,7 +36,7 @@ object PartitionState extends StrictLogging {
       ).flatten
     }
 
-    def fix: Either[String, PartitionState] = {
+    private[impl] def fix: Either[String, PartitionState] = {
       val rootVertex = dag.root
       val rootDescendants = dag.descendantsOf(rootVertex)()
       if (!rootDescendants.map(underlying).contains(InProgress)) {
@@ -47,7 +48,7 @@ object PartitionState extends StrictLogging {
       }
     }
 
-    def redo(vertex: DagVertex): Either[String, PartitionState] = {
+    private[impl] def redo(vertex: DagVertex): Either[String, PartitionState] = {
       val branch = dag.meAndMyDescendantsUnlessRoot(vertex)
       val branchStates = branch.map(underlying)
       val ancestorStates = dag.ancestorsOf(vertex).map(underlying)
@@ -63,7 +64,7 @@ object PartitionState extends StrictLogging {
     }
 
     // TODO look at errors and decide what to do with DAG
-    def fail(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] = {
+    private[impl] def fail(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] = {
       val errors = collectSaturationErrors(sourceVertices, targetVertex)
       if (errors.nonEmpty) {
         Left(s"${errors.mkString("\n","\n","\n")}$printable")
@@ -75,7 +76,7 @@ object PartitionState extends StrictLogging {
     }
 
     // TODO look at errors and decide what to do with DAG
-    def succeed(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] = {
+    private[impl] def succeed(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] = {
       val errors = collectSaturationErrors(sourceVertices, targetVertex)
       if (errors.nonEmpty) {
         Left(s"${errors.mkString("\n","\n","\n")}$printable")
@@ -87,7 +88,7 @@ object PartitionState extends StrictLogging {
     }
 
     // TODO look at errors and decide what to do with DAG
-    def progress(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] =
+    private[impl] def progress(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] =
       if (underlying(targetVertex) != Pending) {
         Left(s"Progressing vertex $targetVertex is not Pending !!! \n$printable")
       } else if (sourceVertices.forall(underlying(_) != Complete)) {
@@ -98,16 +99,16 @@ object PartitionState extends StrictLogging {
         Right(newState)
       }
 
-    def isSaturated: Boolean =
+    private[impl] def isSaturated: Boolean =
       underlying(dag.root) == Complete && dag.descendantsOfRoot(v => underlying(v) != Failed).forall(v => underlying(v) == Complete)
 
-    def getPendingVertices: SortedSet[DagVertex] =
+    private[impl] def getPendingVertices: SortedSet[DagVertex] =
       TreeSet(underlying.collect { case (v, ps) if ps == Pending && dag.ancestorsOf(v).forall(underlying(_) == Complete) => v }.toSeq:_*)
 
-    def getProgressingVertices: SortedSet[DagVertex] =
+    private[impl] def getProgressingVertices: SortedSet[DagVertex] =
       TreeSet(underlying.collect { case (v, ps) if ps == InProgress && dag.ancestorsOf(v).forall(underlying(_) == Complete) => v }.toSeq:_*)
 
-    def printable: String = {
+    private[impl] def printable: String = {
       val stateByVertex = underlying.map { case (v, state) => v.vid -> state }
       val edgesWithState: List[(String, String)] = dag.edges.map(t => t._1.vid -> t._2.vid).map { case (f, t) => s"$f\n${stateByVertex(f)}" -> s"$t\n${stateByVertex(t)}" }(breakOut)
       val verticesWithState: Set[String] = stateByVertex.map { case (v, state) => s"$v\n$state" }(breakOut)

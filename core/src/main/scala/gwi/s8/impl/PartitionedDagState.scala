@@ -1,14 +1,15 @@
-package gwi.s8
+package gwi.s8.impl
 
 import com.typesafe.scalalogging.StrictLogging
+import gwi.s8.{DagPartition, DagVertex, Dependency}
 
 import scala.collection.immutable.{SortedSet, TreeMap, TreeSet}
 import scala.math.Ordering
 
-object PartitionedDagState extends StrictLogging {
+private[impl] object PartitionedDagState extends StrictLogging {
   import PartitionState._
 
-  def apply(partitionsByVertex: Map[DagVertex, Set[DagPartition]])(implicit dag: Dag[DagVertex], po: Ordering[DagPartition], vo: Ordering[DagVertex]): PartitionedDagState = {
+  private[impl] def apply(partitionsByVertex: Map[DagVertex, Set[DagPartition]])(implicit dag: Dag[DagVertex], po: Ordering[DagPartition], vo: Ordering[DagVertex]): PartitionedDagState = {
     val rootVertex = dag.root
     val rootVertexPartitions = partitionsByVertex(rootVertex)
     val vertexPartitions = partitionsByVertex.filterKeys(_ != rootVertex)
@@ -24,9 +25,9 @@ object PartitionedDagState extends StrictLogging {
     TreeMap(rootVertexPartitions.map(p => p -> PartitionState.buildGraphForPartition(p, rootVertex, partitionsByVertex)).toSeq:_*)
   }
 
-  implicit class PartitionedDagStatePimp(underlying: PartitionedDagState)(implicit dag: Dag[DagVertex], po: Ordering[DagPartition], vo: Ordering[DagVertex]) {
+  private[impl] implicit class PartitionedDagStatePimp(underlying: PartitionedDagState)(implicit dag: Dag[DagVertex], po: Ordering[DagPartition], vo: Ordering[DagVertex]) {
 
-    def addPartitions(partitions: TreeSet[DagPartition]): PartitionedDagState = {
+    private[impl] def addPartitions(partitions: TreeSet[DagPartition]): PartitionedDagState = {
       val (existingPartitions, nonExistingPartitions) = partitions.partition(underlying.contains)
       val partitionState = PartitionState()
       existingPartitions.foreach( p => logger.warn(s"Idempotently not inserting partition that already exist : $p") )
@@ -34,7 +35,7 @@ object PartitionedDagState extends StrictLogging {
       underlying ++ nonExistingPartitions.map(_ -> partitionState)
     }
 
-    def updatePartitions(partitions: TreeSet[DagPartition]): PartitionedDagState = {
+    private[impl] def updatePartitions(partitions: TreeSet[DagPartition]): PartitionedDagState = {
       val (existingPartitions, nonExistingPartitions) = partitions.partition(underlying.contains) // updated partition should not be progressing
       nonExistingPartitions.foreach( p => logger.error(s"Partition cannot be changed because it is missing : $p") )
       existingPartitions.foreach( p => logger.error(s"Partition changed : $p") )
@@ -51,7 +52,7 @@ object PartitionedDagState extends StrictLogging {
       underlying ++ newPartitionsDagState
     }
 
-    def redo(p: DagPartition, v: DagVertex): PartitionedDagState =
+    private[impl] def redo(p: DagPartition, v: DagVertex): PartitionedDagState =
       underlying.flatAdjust(p) {
         case None =>
           logger.error(s"Redoing $v of partition $p that doesn't exist !!!")
@@ -67,7 +68,7 @@ object PartitionedDagState extends StrictLogging {
           }
       }
 
-    def fix(p: DagPartition): PartitionedDagState =
+    private[impl] def fix(p: DagPartition): PartitionedDagState =
       underlying.adjust(p) { partitionState =>
         partitionState.fix match {
           case Left(error) =>
@@ -79,7 +80,7 @@ object PartitionedDagState extends StrictLogging {
         }
       }
 
-    def fail(dep: Dependency): PartitionedDagState = dep match {
+    private[impl] def fail(dep: Dependency): PartitionedDagState = dep match {
       case Dependency(p, sourceVertices, targetVertex) =>
         underlying.adjust(p) { partitionState =>
           partitionState.fail(sourceVertices, targetVertex) match {
@@ -93,7 +94,7 @@ object PartitionedDagState extends StrictLogging {
         }
     }
 
-    def succeed(dep: Dependency): PartitionedDagState = dep match {
+    private[impl] def succeed(dep: Dependency): PartitionedDagState = dep match {
       case Dependency(p, sourceVertices, targetVertex) =>
         underlying.adjust(p) { partitionState =>
           partitionState.succeed(sourceVertices, targetVertex) match {
@@ -107,7 +108,7 @@ object PartitionedDagState extends StrictLogging {
         }
     }
 
-    def progress: PartitionedDagState =
+    private[impl] def progress: PartitionedDagState =
       getPendingDeps.foldLeft(underlying) { case (acc, Dependency(p, sourceVertices, targetVertex)) =>
         acc.adjust(p) { partitionState =>
           partitionState.progress(sourceVertices, targetVertex) match {
@@ -121,16 +122,16 @@ object PartitionedDagState extends StrictLogging {
         }
       }
 
-    def isSaturated: Boolean = underlying.values.forall(_.isSaturated)
+    private[impl] def isSaturated: Boolean = underlying.values.forall(_.isSaturated)
 
-    def getPendingDeps: SortedSet[Dependency] =
+    private[impl] def getPendingDeps: SortedSet[Dependency] =
       TreeSet(
         underlying.flatMap { case (p, partitionState) =>
           partitionState.getPendingVertices.map ( v => Dependency(p, dag.neighborAncestorsOf(v), v) )
         }.toSeq:_*
       )
 
-    def getProgressingDeps: SortedSet[Dependency] =
+    private[impl] def getProgressingDeps: SortedSet[Dependency] =
       TreeSet(
         underlying.flatMap { case (p, partitionState) =>
           partitionState.getProgressingVertices.map ( v => Dependency(p, dag.neighborAncestorsOf(v), v) )

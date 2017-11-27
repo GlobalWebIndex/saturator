@@ -3,7 +3,8 @@ package gwi.s8
 import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Cancellable, Props}
 import akka.persistence.fsm.PersistentFSM.FSMState
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
-import gwi.s8.DagFSMState.DagStateEvent
+import gwi.s8.impl.DagFSMState.DagStateEvent
+import gwi.s8.impl.DagFSMState
 
 import scala.concurrent.ExecutionContext.Implicits
 import scala.math.Ordering

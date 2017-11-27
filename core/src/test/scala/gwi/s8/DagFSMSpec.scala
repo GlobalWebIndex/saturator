@@ -13,7 +13,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
   override def afterAll(): Unit = try Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf) finally super.afterAll()
 
-  implicit val edges: Set[(DagVertex, DagVertex)] =
+  private[this] implicit val edges: Set[(DagVertex, DagVertex)] =
     Set(
       1 -> 2, 2 -> 6,
       1 -> 3, 3 -> 6,
