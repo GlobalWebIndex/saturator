@@ -8,14 +8,6 @@ case class DagPartition(pid: String)
 
 case class DagVertex(vid: String)
 
-object DagVertex {
-  object State {
-    val Pending = "Pending"
-    val Complete = "Complete"
-    val InProgress = "InProgress"
-    val Failed = "Failed"
-  }
-}
 case class Dependency(p: DagPartition, sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex)
 
 object Dependency {

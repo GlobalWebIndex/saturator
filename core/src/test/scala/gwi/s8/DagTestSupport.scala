@@ -1,5 +1,7 @@
 package gwi.s8
 
+import scala.collection.immutable.TreeMap
+
 trait DagTestSupport {
   import language.implicitConversions
 
@@ -23,4 +25,8 @@ trait DagTestSupport {
   implicit def longsToPartitionsByVertex(is: List[(Int, List[Long])]): List[(DagVertex, List[DagPartition])] = is.map { case (v,ps) => implicitly[DagVertex](v) -> implicitly[List[DagPartition]](ps) }
   implicit def intsToStateByVertex(is: Map[Int, String]): Map[DagVertex, String] = is.map { case (v,s) => implicitly[DagVertex](v) -> s }
   implicit def intsToVertexStatesByPartition(is: Map[Int, Map[DagVertex, String]]): Map[DagPartition, Map[DagVertex, String]] = is.map { case (v,ps) => implicitly[DagPartition](v) -> ps }
+
+  implicit def sortedPartitionState(ps: Map[Int, String]): PartitionState = TreeMap(ps.map { case (v,s) => implicitly[DagVertex](v) -> s}.toSeq:_*)
+  implicit def sortedPartitionedDagState(pds: Map[Int, TreeMap[DagVertex, String]]): PartitionedDagState = TreeMap(pds.map { case (v,s) => implicitly[DagPartition](v) -> s}.toSeq:_*)
+
 }

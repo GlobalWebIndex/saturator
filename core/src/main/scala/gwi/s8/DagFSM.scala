@@ -3,7 +3,7 @@ package gwi.s8
 import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Cancellable, Props}
 import akka.persistence.fsm.PersistentFSM.FSMState
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
-import gwi.s8.DagState.DagStateEvent
+import gwi.s8.DagFSMState.DagStateEvent
 
 import scala.concurrent.ExecutionContext.Implicits
 import scala.math.Ordering
@@ -14,8 +14,8 @@ class DagFSM(
         handler: ActorRef,
         schedule: Schedule
       )(implicit edges: Set[(DagVertex, DagVertex)], po: Ordering[DagPartition], vo: Ordering[DagVertex])
-  extends PersistentFSM[FSMState, DagState, DagStateEvent] with LoggingPersistentFSM[FSMState, DagState, DagStateEvent] with ActorLogging {
-  import DagState._
+  extends PersistentFSM[FSMState, DagFSMState, DagStateEvent] with LoggingPersistentFSM[FSMState, DagFSMState, DagStateEvent] with ActorLogging {
+  import DagFSMState._
   import DagFSM._
 
   override def logDepth = 100
@@ -24,7 +24,7 @@ class DagFSM(
 
   log.info(s"Starting DagFSM with persistence id $persistenceId ...")
 
-  private[this] def schedulePartitionCheck(currentState: DagState): List[Cancellable] = {
+  private[this] def schedulePartitionCheck(currentState: DagFSMState): List[Cancellable] = {
     def scheduleCheck(checkOpt: Option[PartitionCheck], cmd: out.S8OutCmd): Option[Cancellable] =
       checkOpt.map { check =>
         context.system.scheduler.schedule(
@@ -39,7 +39,7 @@ class DagFSM(
     ).flatten
   }
 
-  startWith(DagEmpty, DagState.empty)
+  startWith(DagEmpty, DagFSMState.empty)
 
   when(DagEmpty) {
     case Event(system.Initialize(partitionsByVertex), _) =>
@@ -50,40 +50,40 @@ class DagFSM(
     case Event(c@in.AckSaturation(dep, succeeded), _) =>
       goto(Saturating)
         .applying(DagStateEvent.forSaturationOutcome(succeeded, dep), SaturationInitializedEvent)
-        .replying(out.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(c, stateData.partitionedDagState, stateData.depsInFlight))
 
     case Event(in.InsertPartitions(newPartitions), _) =>
       goto(Saturating)
         .applying(PartitionInsertsEvent(newPartitions), SaturationInitializedEvent)
-        .replying(out.Submitted(in.InsertPartitions(newPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(in.InsertPartitions(newPartitions), stateData.partitionedDagState, stateData.depsInFlight))
 
     case Event(in.UpdatePartitions(updatedPartitions), _) =>
       goto(Saturating)
         .applying(PartitionUpdatesEvent(updatedPartitions), SaturationInitializedEvent)
-        .replying(out.Submitted(in.UpdatePartitions(updatedPartitions), stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(in.UpdatePartitions(updatedPartitions), stateData.partitionedDagState, stateData.depsInFlight))
 
     case Event(c@in.RedoDagBranch(partition, vertex), _) =>
       goto(Saturating)
         .applying (DagBranchRedoEvent(partition, vertex), SaturationInitializedEvent)
-        .replying(out.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(c, stateData.partitionedDagState, stateData.depsInFlight))
 
     case Event(c@in.FixPartition(partition), _) =>
       goto(Saturating)
         .applying(PartitionFixEvent(partition), SaturationInitializedEvent)
-        .replying(out.Submitted(c, stateData.vertexStatesByPartition, stateData.depsInFlight))
+        .replying(out.Submitted(c, stateData.partitionedDagState, stateData.depsInFlight))
 
     case Event(in.GetState, stateData) =>
-      stay() replying out.Submitted(in.GetState, stateData.vertexStatesByPartition, stateData.depsInFlight)
+      stay() replying out.Submitted(in.GetState, stateData.partitionedDagState, stateData.depsInFlight)
 
     case Event(in.ShutDown, _) =>
-      stop() replying out.Submitted(in.ShutDown, stateData.vertexStatesByPartition, stateData.depsInFlight)
+      stop() replying out.Submitted(in.ShutDown, stateData.partitionedDagState, stateData.depsInFlight)
 
     case Event(system.Submit(cmd), _) =>
-      stay() replying out.Issued(cmd, stateData.vertexStatesByPartition, stateData.depsInFlight)
+      stay() replying out.Issued(cmd, stateData.partitionedDagState, stateData.depsInFlight)
   }
 
   onTransition {
-    case DagEmpty -> DagEmpty if nextStateData.getVertexStatesByPartition.isEmpty => // Initialization happens only on fresh start, not when persistent event log is replayed
+    case DagEmpty -> DagEmpty if nextStateData.isEmpty => // Initialization happens only on fresh start, not when persistent event log is replayed
       log.info("Starting FSM, DAG created, initializing ...")
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
       self ! system.Initialize(initialData)
@@ -94,15 +94,15 @@ class DagFSM(
     case x -> Saturating =>
       if (x == DagEmpty) {
         log.info(s"Dag initialized ...")
-        handler ! out.Issued(out.Initialized, nextStateData.vertexStatesByPartition, nextStateData.depsInFlight)
+        handler ! out.Issued(out.Initialized, nextStateData.partitionedDagState, nextStateData.depsInFlight)
       }
       val deps = nextStateData.getNewProgressingDeps
       if (deps.nonEmpty) {
         log.info(s"Saturating ${deps.size} dependencies ...")
-        deps.foreach( dep => handler ! out.Issued(out.Saturate(dep), nextStateData.vertexStatesByPartition, nextStateData.depsInFlight) )
+        deps.foreach( dep => handler ! out.Issued(out.Saturate(dep), nextStateData.partitionedDagState, nextStateData.depsInFlight) )
       } else if (nextStateData.isSaturated) {
         log.info(s"Dag is fully saturated ...")
-        handler ! out.Issued(out.Saturated, nextStateData.vertexStatesByPartition, nextStateData.depsInFlight)
+        handler ! out.Issued(out.Saturated, nextStateData.partitionedDagState, nextStateData.depsInFlight)
       }
   }
 
@@ -112,7 +112,7 @@ class DagFSM(
       stay()
   }
 
-  def applyEvent(event: DagStateEvent, dagState: DagState): DagState = event match {
+  def applyEvent(event: DagStateEvent, dagState: DagFSMState): DagFSMState = event match {
     case e =>
       dagState.updated(e)
   }
