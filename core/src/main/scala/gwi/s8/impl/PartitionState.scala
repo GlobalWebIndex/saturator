@@ -55,8 +55,8 @@ private[impl] object PartitionState extends StrictLogging {
 
     private[impl] def fail(sourceVertices: SortedSet[DagVertex], targetVertex: DagVertex): Either[String, PartitionState] =
       collectErrors(underlying.updated(targetVertex, Failed))(
-        sourceVertices.forall(underlying(_) == Complete) -> "Illegal saturation from inComplete vertex",
-        (underlying(targetVertex) == InProgress) -> "Illegal saturation of not progressing vertex",
+        sourceVertices.forall(underlying(_) == Complete) -> "Illegal failed saturation from inComplete vertex",
+        (underlying(targetVertex) == InProgress) -> "Illegal failed saturation of not progressing vertex",
         underlying.filterKeys(dag.neighborDescendantsOf(targetVertex).contains).forall(_._2 == Pending) -> "Dep saturated with target descendants not pending"
       )
 

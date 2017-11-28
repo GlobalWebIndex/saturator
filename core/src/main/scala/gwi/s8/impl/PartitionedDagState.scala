@@ -53,7 +53,7 @@ private[impl] object PartitionedDagState extends StrictLogging {
     private[impl] def updatePartitions(partitions: TreeSet[DagPartition]): PartitionedDagState = {
       val (existingPartitions, nonExistingPartitions) = partitions.partition(underlying.contains) // updated partition should not be progressing
       nonExistingPartitions.foreach( p => logger.error(s"Partition cannot be changed because it is missing : $p") )
-      existingPartitions.foreach( p => logger.error(s"Partition changed : $p") )
+      existingPartitions.foreach( p => logger.info(s"Partition changed : $p") )
       val newPartitionsDagState =
         existingPartitions.flatMap { p =>
           underlying(p).redo(dag.root) match {
