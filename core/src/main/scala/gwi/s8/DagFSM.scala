@@ -28,6 +28,7 @@ class DagFSM(
   private[this] def schedulePartitionCheck(currentState: DagFSMState): List[Cancellable] = {
     def scheduleCheck(checkOpt: Option[PartitionCheck], cmd: out.S8OutCmd): Option[Cancellable] =
       checkOpt.map { check =>
+        log.info(s"Scheduling $cmd at $check for handler $handler")
         context.system.scheduler.schedule(
           check.interval, check.delay, self, system.Submit(cmd)
         )(Implicits.global, handler)
@@ -80,6 +81,7 @@ class DagFSM(
       stop() replying out.Submitted(in.ShutDown, stateData.partitionedDagState, stateData.depsInFlight)
 
     case Event(system.Submit(cmd), _) =>
+      log.info(s"Issuing cmd $cmd")
       stay() replying out.Issued(cmd, stateData.partitionedDagState, stateData.depsInFlight)
   }
 
