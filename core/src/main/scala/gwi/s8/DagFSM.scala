@@ -6,7 +6,6 @@ import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
 import gwi.s8.impl.DagFSMState.DagStateEvent
 import gwi.s8.impl.DagFSMState
 
-import scala.concurrent.ExecutionContext.Implicits
 import scala.math.Ordering
 import scala.reflect.ClassTag
 
@@ -31,7 +30,7 @@ class DagFSM(
         log.info(s"Scheduling $cmd at $check for handler $handler")
         context.system.scheduler.schedule(
           check.interval, check.delay, self, system.Submit(cmd)
-        )(Implicits.global, handler)
+        )(context.dispatcher, handler)
       }
 
     val Schedule(createdCheckOpt, changedCheckOpt) = schedule
