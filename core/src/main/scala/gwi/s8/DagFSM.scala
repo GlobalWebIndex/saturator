@@ -29,7 +29,7 @@ class DagFSM(
       checkOpt.map { check =>
         log.info(s"Scheduling $cmd at $check for handler $handler")
         context.system.scheduler.schedule(
-          check.interval, check.delay, self, system.Submit(cmd)
+          check.delay, check.interval, self, system.Submit(cmd)
         )(context.dispatcher, handler)
       }
 
