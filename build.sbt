@@ -1,9 +1,11 @@
 
-version in ThisBuild := "0.3.9"
+version in ThisBuild := "0.4.0"
 crossScalaVersions in ThisBuild := Seq("2.12.4", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi
+
+lazy val tempKryoDep = "net.globalwebindex" %% "akka-kryo-serialization" % "0.5.3-SNAPSHOT" // adhoc published before PR is merged https://github.com/romix/akka-kryo-serialization/pull/124
 
 lazy val saturator = (project in file("."))
   .settings(aggregate in update := false)
@@ -19,7 +21,7 @@ lazy val `Saturator-core` = (project in file("core"))
   .enablePlugins(CommonPlugin)
   .settings(publishSettings("GlobalWebIndex", "saturator-core", s3Resolver))
   .settings(libraryDependencies ++= Seq(
-      asciiGraphs, akkaActor, akkaPersistence, akkaKryoSerialization,
+      asciiGraphs, akkaActor, akkaPersistence, tempKryoDep,
       akkaTestkit, scalatest, akkaPersistenceInMemory % "test", loggingImplLog4j % "test"
     )
   ).dependsOn(`Saturator-api` % "compile->compile;test->test")
