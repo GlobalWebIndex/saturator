@@ -9,6 +9,7 @@ import gwi.s8.impl.DagFSMState
 import scala.math.Ordering
 import scala.reflect.ClassTag
 
+/** FSM Persistent actor that is propagating saturator state changes to the user system. */
 class DagFSM(
         init: () => List[(DagVertex, List[DagPartition])],
         handler: ActorRef,

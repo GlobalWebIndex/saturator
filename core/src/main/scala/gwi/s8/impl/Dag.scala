@@ -4,6 +4,7 @@ import scala.collection.breakOut
 import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.math.Ordering
 
+/** Direct Acyclic Graph, represented as a set of edges between vertices  */
 private[impl] case class Dag[V](edges: Set[(V,V)])(implicit vo: Ordering[V]) {
 
   private[impl] def root: V = {

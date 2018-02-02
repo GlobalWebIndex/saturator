@@ -41,8 +41,16 @@ P4 --------->  |               |  |                +--------------->  |
 
 This system was designed to orchestrate an ETL pipeline or a system of microservices, it could be used together with [mawex](https://github.com/GlobalWebIndex/mawex)
 as a task/job execution engine. Ie. your pipeline would let :
- - saturator decide what should be done
+ - saturator decide what should be done based on changes in user system like new/created or changed partitions or outcome of job executions
  - mawex take care about the actual ETL job or microservice execution
+
+### Saturator Flow
+
+1. DagFSM is provided with initial state that represents state of the outer world (eg. partitioned storages)
+2. DagFSM starts saturating (issuing commands to the user system) dependencies until all vertices in all partition DAGs are Complete and the FSM is idle
+3. In the mean time, DagFSM asks user system for :
+    - newly created partitions that are added as a new layer to partitioned DAG
+    - partitions that changed in the user system so that it can re-evaluate particular partition DAG
 
 ### how-to
 
@@ -67,7 +75,3 @@ $ cd docker
 $ docker-compose -f saturator-$plugin.yml up
 
 ```
-
-It starts with a definition of a DAG which is a collection of edges, new partition interval and existing partitions in head Vertex.
-Saturator FSM starts satisfying dependencies until it saturates DAG and then new partition is submitted periodically which yields a bunch of
-unsatisfied dependencies, leaving DAG in unsaturated state -> FSM.

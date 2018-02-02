@@ -6,6 +6,7 @@ import gwi.s8.{DagPartition, DagVertex, Dependency}
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.math.Ordering
 
+/** Event Sourced Persistent state of FSM Actor, [[gwi.s8.impl.DagFSMState.DagStateEvent]] are applied to it. */
 protected[s8] case class DagFSMState(partitionedDagState: PartitionedDagState, depsInFlight: Set[Dependency])
 
 protected[s8] object DagFSMState extends StrictLogging {

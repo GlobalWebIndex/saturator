@@ -37,7 +37,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
     val probe = TestProbe()
     val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "test-dag-fsm")
-    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].cmd)
+    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].msg)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
       handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(1), 2)))
@@ -46,7 +46,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
       handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(1), 5)))
       handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(3,2), 6)))
       handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(4), 7)))
-      assertResult(out.Saturated)(probe.expectMsgType[out.Issued].cmd)
+      assertResult(out.Saturated)(probe.expectMsgType[out.Issued].msg)
     }
 
     // initial saturation
@@ -74,7 +74,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
     handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, TreeSet(1), 2)))
     handleIssuedCmd(probe, fsmActor, None, Some(Dependency(2L, TreeSet(3,2), 6)))
-    assertResult(out.Saturated)(probe.expectMsgType[out.Issued].cmd)
+    assertResult(out.Saturated)(probe.expectMsgType[out.Issued].msg)
 
     // saturation after recreating a partition
 
@@ -116,7 +116,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     def partitionsByVertex: List[(Int, List[Long])] = List(1 -> List(1L))
     val probe = TestProbe()
     val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "dag-fsm-2")
-    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].cmd)
+    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].msg)
 
     def assertSaturationOfDagForPartition(p: DagPartition) = {
       handleIssuedCmd(probe, fsmActor, Some(Dependency(p, TreeSet(1), 2)), Some(Dependency(p, TreeSet(1), 2)))
@@ -124,7 +124,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
       handleIssuedCmd(probe, fsmActor, Some(Dependency(p, TreeSet(1), 2)), Some(Dependency(p, TreeSet(1), 4)))
       handleIssuedCmd(probe, fsmActor, Some(Dependency(p, TreeSet(1), 2)), Some(Dependency(p, TreeSet(1), 5)))
       handleIssuedCmd(probe, fsmActor, None, Some(Dependency(p, TreeSet(4), 7)))
-      assertResult(out.Saturated)(probe.expectMsgType[out.Issued].cmd)
+      assertResult(out.Saturated)(probe.expectMsgType[out.Issued].msg)
     }
 
     assertSaturationOfDagForPartition(1L)
@@ -150,7 +150,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
 
     val probe = TestProbe()
     val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "dag-fsm-4")
-    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].cmd)
+    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].msg)
 
     val depsToSaturate = (1 to 30).map ( _ => handleIssuedCmd(probe, fsmActor, None) )
 
