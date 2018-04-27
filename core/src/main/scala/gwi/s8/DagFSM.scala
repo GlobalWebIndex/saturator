@@ -19,6 +19,8 @@ class DagFSM(
   import DagFSMState._
   import DagFSM._
 
+  private var cancellables: List[Cancellable] = List()
+
   override def logDepth = 100
   override def persistenceId: String = self.path.toStringWithoutAddress
   override def domainEventClassTag: ClassTag[DagStateEvent] = reflect.classTag[DagStateEvent]
@@ -90,10 +92,8 @@ class DagFSM(
       log.info("Starting FSM, DAG created, initializing ...")
       val initialData = init().map { case (v, p) => v -> p.toSet }.toMap
       self ! system.Initialize(initialData)
-      schedulePartitionCheck(nextStateData)
     case DagEmpty -> DagEmpty =>
       log.info("Starting FSM, DAG already exists ...")
-      schedulePartitionCheck(nextStateData)
     case x -> Saturating =>
       if (x == DagEmpty) {
         log.info(s"Dag initialized ...")
@@ -115,11 +115,18 @@ class DagFSM(
       stay()
   }
 
+  onTermination {
+    case _ => cancellables.foreach(_.cancel())
+  }
+
   def applyEvent(event: DagStateEvent, dagState: DagFSMState): DagFSMState = event match {
     case e =>
       dagState.updated(e)
   }
 
+  override def onRecoveryCompleted() {
+    cancellables = schedulePartitionCheck(stateData) ++ cancellables
+  }
 }
 
 object DagFSM {
