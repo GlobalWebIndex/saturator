@@ -21,8 +21,8 @@ lazy val `Saturator-core` = (project in file("core"))
   .enablePlugins(CommonPlugin)
   .settings(publishSettings("GlobalWebIndex", "saturator-core", s3Resolver))
   .settings(libraryDependencies ++= Seq(
-      asciiGraphs, akkaActor, akkaPersistence, tempKryoDep,
-      akkaTestkit, scalatest, akkaPersistenceInMemory % "test", loggingImplLog4j % "test"
+      asciiGraphs, akkaActor, akkaPersistence, tempKryoDep, akkaSlf4j,
+      akkaTestkit, scalatest, akkaPersistenceInMemory % "test", loggingImplLog4j % "test",
     )
   ).dependsOn(`Saturator-api` % "compile->compile;test->test")
 
