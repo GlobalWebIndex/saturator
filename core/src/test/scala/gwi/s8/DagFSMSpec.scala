@@ -1,6 +1,6 @@
 package gwi.s8
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ActorSystem, PoisonPill}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import org.scalatest.{BeforeAndAfterAll, FreeSpecLike, Matchers, Suite}
 
@@ -171,5 +171,67 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
       assert(depsInFlight.isEmpty)
     }
 
+  }
+
+  "created partition check should be initialized after the actor is started" in {
+    val actorName = "dag-fsm-start-created-partiton-check"
+    val probe = TestProbe()
+    val partitionsByVertex = List(1 -> List(1L))
+    val schedule = Schedule(Some(CreatedPartitionCheck(1.minute, Duration.Zero)), None)
+
+    DagFSM(partitionsByVertex, probe.ref, schedule, actorName)
+
+    probe.fishForSpecificMessage(5.seconds) {
+      case out.Issued(out.GetCreatedPartitions(_),_,_) => true
+    }
+  }
+
+  "created partition check should be initialized after the actor is restarted" in {
+    val actorName = "dag-fsm-restart-created-partiton-check"
+    val probe = TestProbe()
+    val partitionsByVertex = List(1 -> List(1L))
+    val schedule = Schedule(Some(CreatedPartitionCheck(1.minute, Duration.Zero)), None)
+
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, actorName)
+
+    fsmActor ! PoisonPill
+    Thread.sleep(1000)
+
+    DagFSM(partitionsByVertex, probe.ref, schedule, actorName)
+
+    probe.fishForSpecificMessage(5.seconds) {
+      case out.Issued(out.GetCreatedPartitions(_),_,_) => true
+    }
+  }
+
+  "changed partition check should be initialized after the actor is started" in {
+    val actorName = "dag-fsm-start-changed-partiton-check"
+    val probe = TestProbe()
+    val partitionsByVertex = List(1 -> List(1L))
+    val schedule = Schedule(None, Some(ChangedPartitionCheck(1.minute, Duration.Zero)))
+
+    DagFSM(partitionsByVertex, probe.ref, schedule, actorName)
+
+    probe.fishForSpecificMessage(5.seconds) {
+      case out.Issued(out.GetChangedPartitions(_),_,_) => true
+    }
+  }
+
+  "changed partition check should be initialized after the actor is restarted" in {
+    val actorName = "dag-fsm-restart-changed-partiton-check"
+    val probe = TestProbe()
+    val partitionsByVertex = List(1 -> List(1L))
+    val schedule = Schedule(None, Some(ChangedPartitionCheck(1.minute, Duration.Zero)))
+
+    val fsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, actorName)
+
+    fsmActor ! PoisonPill
+    Thread.sleep(1000)
+
+    DagFSM(partitionsByVertex, probe.ref, schedule, actorName)
+
+    probe.fishForSpecificMessage(5.seconds) {
+      case out.Issued(out.GetChangedPartitions(_),_,_) => true
+    }
   }
 }
