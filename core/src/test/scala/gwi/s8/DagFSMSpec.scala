@@ -1,15 +1,21 @@
 package gwi.s8
 
-import akka.actor.{ActorRef, ActorSystem, PoisonPill}
+import akka.actor.{Actor, ActorRef, ActorSystem, Kill, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
+import com.typesafe.scalalogging.StrictLogging
+import gwi.s8.Supervisor.CreateDagFsm
+import gwi.s8.in.GetState
+import gwi.s8.out.Submitted
 import org.scalatest.{BeforeAndAfterAll, FreeSpecLike, Matchers, Suite}
 
-import collection.immutable.TreeSet
+import collection.immutable.{TreeMap, TreeSet}
 import concurrent.duration._
 import concurrent.{Await, ExecutionContext, Future}
 
 class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagTestSupport with Matchers with FreeSpecLike with ImplicitSender {
   implicit lazy val system = ActorSystem("AkkaSuiteSystem")
+
+  type State = TreeMap[DagPartition, Map[DagVertex, String]]
 
   override def afterAll(): Unit = try Await.ready(Future(system.terminate())(ExecutionContext.global), Duration.Inf) finally super.afterAll()
 
@@ -99,17 +105,6 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
       assert(vertexStatesByPartition.size == 10)
       assert(depsInFlight.isEmpty)
     }
-
-    // persistent state replaying
-    Thread.sleep(300)
-    val newFsmActor = DagFSM(partitionsByVertex, probe.ref, Schedule.noop, "test-dag-fsm")
-
-    newFsmActor ! in.ShutDown
-    expectMsgType[out.Submitted] match { case (out.Submitted(cmd, vertexStatesByPartition, depsInFlight)) =>
-      assert(vertexStatesByPartition.size == 10)
-      assert(depsInFlight.isEmpty)
-    }
-
   }
 
   "testing partition fixing" in {
@@ -233,5 +228,96 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     probe.fishForSpecificMessage(5.seconds) {
       case out.Issued(out.GetChangedPartitions(_),_,_) => true
     }
+  }
+
+  "DagFSM should replay state from event store when it crashed" in {
+    implicit val edges: Set[(DagVertex, DagVertex)] = Set(1 -> 2)
+    val partitionsByVertex: List[(Int, List[Long])] = List(1 -> List(1))
+    val probe = TestProbe()
+    val supervisor = system.actorOf(Props[Supervisor], "supervisor")
+    supervisor ! CreateDagFsm(partitionsByVertex, edges, probe.ref, "fsm-test")
+    val fsmActor = expectMsgType[ActorRef]
+
+    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].msg)
+
+    val initState = getState(fsmActor)
+
+    fsmActor ! in.InsertPartitions(TreeSet(2))
+    expectMsgType[out.Submitted]
+
+    val updatedState = getState(fsmActor)
+
+    fsmActor ! Kill
+
+    val newInitState = getState(fsmActor)
+
+    system.stop(supervisor)
+
+    assertResult(updatedState)(newInitState)
+  }
+
+  "should use current state when it is initialized" in {
+    val edges: Set[(DagVertex, DagVertex)] = Set(1 -> 2)
+    val partitionsByVertex: List[(Int, List[Long])] = List(1 -> List(1))
+    val probe = TestProbe()
+    val supervisor = system.actorOf(Props[Supervisor], "supervisor")
+    supervisor ! CreateDagFsm(partitionsByVertex, edges, probe.ref, "fsm-test")
+    val fsmActor = expectMsgType[ActorRef]
+    assertResult(out.Initialized)(probe.expectMsgType[out.Issued].msg)
+
+    val initState = getState(fsmActor)
+
+    fsmActor ! in.InsertPartitions(TreeSet(2))
+    expectMsgType[out.Submitted]
+
+    val updatedState = getState(fsmActor)
+
+    system.stop(fsmActor)
+
+    val newProbe = TestProbe()
+    val newPartitionsByVertex: List[(Int, List[Long])] = List(1 -> List(4))
+    supervisor ! CreateDagFsm(newPartitionsByVertex, edges, newProbe.ref, "fsm-test")
+    val newFsmActor = expectMsgType[ActorRef]
+    assertResult(out.Initialized)(newProbe.expectMsgType[out.Issued].msg)
+
+    val newInitState = getState(newFsmActor)
+
+    system.stop(supervisor)
+
+    assertResult(1)(newInitState.size)
+    assertResult(DagPartition("4"))(newInitState.firstKey)
+  }
+
+  private def getState(fsmActor: ActorRef): State = {
+    fsmActor ! GetState
+    fishForSpecificMessage(5.seconds) {
+      case Submitted(GetState, state, _) => state
+    }
+  }
+}
+
+object Supervisor {
+  case class CreateDagFsm(
+    init: List[(DagVertex, List[DagPartition])],
+    edges: Set[(DagVertex, DagVertex)],
+    handler: ActorRef,
+    name: String
+  )
+}
+
+class Supervisor extends Actor with DagTestSupport with StrictLogging {
+  import akka.actor.OneForOneStrategy
+  import akka.actor.SupervisorStrategy._
+
+  override val supervisorStrategy =
+    OneForOneStrategy() {
+      case _: Exception => Restart
+    }
+
+  def receive = {
+    case m: CreateDagFsm =>
+      implicit val edges = m.edges
+      sender() ! DagFSM(m.init, m.handler, Schedule.noop, m.name)
+    case m => logger.error(s"Unknown message $m")
   }
 }

@@ -1,6 +1,7 @@
 package gwi.s8
 
 import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Cancellable, Props}
+import akka.persistence.Recovery
 import akka.persistence.fsm.PersistentFSM.FSMState
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
 import gwi.s8.impl.DagFSMState.DagStateEvent
@@ -20,12 +21,19 @@ class DagFSM(
   import DagFSM._
 
   private var cancellables: List[Cancellable] = List()
+  private var recoveryFlag = Recovery()
+  override def recovery: Recovery = recoveryFlag
 
   override def logDepth = 100
   override def persistenceId: String = self.path.toStringWithoutAddress
   override def domainEventClassTag: ClassTag[DagStateEvent] = reflect.classTag[DagStateEvent]
 
   log.info(s"Starting DagFSM with persistence id $persistenceId ...")
+
+  override def aroundPreStart(): Unit = {
+    recoveryFlag = Recovery.none
+    super.aroundPreStart()
+  }
 
   private[this] def schedulePartitionCheck(currentState: DagFSMState): List[Cancellable] = {
     def scheduleCheck(checkOpt: Option[PartitionCheck], cmd: out.S8OutCmd): Option[Cancellable] =
