@@ -283,6 +283,7 @@ class DagFSMSpec extends Suite with TestKitBase with BeforeAndAfterAll with DagT
     val newInitState = getState(newFsmActor)
 
     system.stop(supervisor)
+    Thread.sleep(1000)
 
     assertResult(1)(newInitState.size)
     assertResult(DagPartition("4"))(newInitState.firstKey)
