@@ -4,7 +4,7 @@ import akka.actor.{ActorLogging, ActorRef, ActorRefFactory, Cancellable, Props}
 import akka.persistence.fsm.PersistentFSM.FSMState
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
 import gwi.s8.impl.DagFSMState.DagStateEvent
-import gwi.s8.impl.DagFSMState
+import gwi.s8.impl.{Dag, DagFSMState}
 
 import scala.math.Ordering
 import scala.reflect.ClassTag
@@ -65,6 +65,9 @@ class DagFSM(
       goto(Saturating)
         .applying(PartitionUpdatesEvent(updatedPartitions), SaturationInitializedEvent)
         .replying(out.Submitted(in.UpdatePartitions(updatedPartitions), stateData.partitionedDagState, stateData.depsInFlight))
+
+    case Event(in.RedoDagBranch(partition, vertex), _) if Dag(edges).root == vertex =>
+      stay() replying out.Issued(out.ReindexPartition(partition, vertex), stateData.partitionedDagState, stateData.depsInFlight)
 
     case Event(c@in.RedoDagBranch(partition, vertex), _) =>
       goto(Saturating)
