@@ -123,4 +123,5 @@ object out {
   }
   case class GetCreatedPartitions(rootVertex: DagVertex) extends GetPartitions
   case class GetChangedPartitions(rootVertex: DagVertex) extends GetPartitions
+  case class ReindexPartition(p: DagPartition, rootVertex: DagVertex) extends GetPartitions
 }
