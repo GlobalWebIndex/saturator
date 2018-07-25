@@ -7,7 +7,7 @@ import scala.math.Ordering
 /** Direct Acyclic Graph, represented as a set of edges between vertices  */
 private[impl] case class Dag[V](edges: Set[(V,V)])(implicit vo: Ordering[V]) {
 
-  private[s8] def root: V = {
+  private[impl] def root: V = {
     val ancestorLessVertices = edges.flatMap(v => Set(v._1, v._2)) -- edges.map(_._2)
     require(ancestorLessVertices.size == 1, "DAG must be rooted !!!")
     ancestorLessVertices.head
