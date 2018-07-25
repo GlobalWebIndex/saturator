@@ -66,8 +66,8 @@ class DagFSM(
         .applying(PartitionUpdatesEvent(updatedPartitions), SaturationInitializedEvent)
         .replying(out.Submitted(in.UpdatePartitions(updatedPartitions), stateData.partitionedDagState, stateData.depsInFlight))
 
-    case Event(in.RedoDagBranch(partition, vertex), _) if Dag(edges).root == vertex =>
-      stay() replying out.Issued(out.ReindexPartition(partition, vertex), stateData.partitionedDagState, stateData.depsInFlight)
+    case Event(in.RecreatePartition(partition, rootVertex), _) =>
+      stay() replying out.Issued(out.GetRecreatedPartition(partition, rootVertex), stateData.partitionedDagState, stateData.depsInFlight)
 
     case Event(c@in.RedoDagBranch(partition, vertex), _) =>
       goto(Saturating)

@@ -95,6 +95,7 @@ object in {
 
   case class RedoDagBranch(p: DagPartition, vertex: DagVertex) extends S8InBulkCmd
   case class FixPartition(p: DagPartition) extends S8InBulkCmd
+  case class RecreatePartition(p: DagPartition, rootVertex: DagVertex) extends S8InBulkCmd
 
   case class AckSaturation(dep: Dependency, succeeded: Boolean) extends S8InAppCmd
   sealed trait PartitionChanges extends S8InAppCmd {
@@ -123,5 +124,5 @@ object out {
   }
   case class GetCreatedPartitions(rootVertex: DagVertex) extends GetPartitions
   case class GetChangedPartitions(rootVertex: DagVertex) extends GetPartitions
-  case class ReindexPartition(p: DagPartition, rootVertex: DagVertex) extends GetPartitions
+  case class GetRecreatedPartition(p: DagPartition, rootVertex: DagVertex) extends GetPartitions
 }
