@@ -5,7 +5,7 @@ import akka.persistence.Recovery
 import akka.persistence.fsm.PersistentFSM.FSMState
 import akka.persistence.fsm.{LoggingPersistentFSM, PersistentFSM}
 import gwi.s8.impl.DagFSMState.DagStateEvent
-import gwi.s8.impl.{Dag, DagFSMState}
+import gwi.s8.impl.DagFSMState
 
 import scala.math.Ordering
 import scala.reflect.ClassTag
