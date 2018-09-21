@@ -1,6 +1,6 @@
 
-version in ThisBuild := "0.5.2"
-crossScalaVersions in ThisBuild := Seq("2.12.4", "2.11.8")
+version in ThisBuild := "0.5.3"
+crossScalaVersions in ThisBuild := Seq("2.12.6", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi
@@ -30,5 +30,5 @@ lazy val `Saturator-example` = (project in file("example"))
   .enablePlugins(CommonPlugin, DockerPlugin)
   .settings(publish := { })
   .settings(libraryDependencies ++= clist ++ Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLogback))
-  .settings(deploy(DeployDef(config("app") extend Compile, "openjdk:8", "gwiq", "saturator-example", "gwi.s8.Launcher")))
+  .settings(deploy(DeployDef(config("app") extend Compile, "anapsix/alpine-java:8u144b01_jdk_unlimited", "gwiq", "saturator-example", "gwi.s8.Launcher")))
   .dependsOn(`Saturator-core` % "compile->compile;test->test")
