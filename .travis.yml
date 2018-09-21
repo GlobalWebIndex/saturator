@@ -5,9 +5,9 @@ services:
   - docker
 language: scala
 scala:
-    - 2.12.4
+  - 2.12.6
 jdk:
-    - oraclejdk8
+  - anapsix/alpine-java:8u144b01_jdk_unlimited
 cache:
   directories:
     - $HOME/.m2/repository
