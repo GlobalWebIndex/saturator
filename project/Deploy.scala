@@ -4,6 +4,7 @@ import net.globalwebindex.sbt.docker.SmallerDockerPlugin.autoImport._
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport._
 import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport._
 import com.typesafe.sbt.SbtNativePackager.autoImport._
+
 object Deploy {
 
   private[this] def isFrequentlyChangingFile(file: sbt.File): Boolean = {

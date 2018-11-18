@@ -21,13 +21,6 @@ pipeline:
     image: gwiq/sbt-docker:1.2.4
     commands:
       - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 -Dsbt.gigahorse=false test
-    secrets:
-      - source: aws_access_key_id
-        target: aws_access_key_id
-      - source: aws_secret_access_key
-        target: aws_secret_access_key
-      - source: aws_region
-        target: aws_region
     when:
       event: push
       matrix:
@@ -55,13 +48,6 @@ pipeline:
     image: gwiq/sbt-docker:1.2.4
     commands:
       - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 ${APP}/docker:stage
-    secrets:
-      - source: aws_access_key_id
-        target: aws_access_key_id
-      - source: aws_secret_access_key
-        target: aws_secret_access_key
-      - source: aws_region
-        target: aws_region
     when:
       event: [deployment, tag]
       matrix:
@@ -90,12 +76,6 @@ pipeline:
         target: docker_user
       - source: docker_password
         target: docker_password
-      - source: aws_access_key_id
-        target: aws_access_key_id
-      - source: aws_secret_access_key
-        target: aws_secret_access_key
-      - source: aws_region
-        target: aws_region
     commands:
       - docker build -t local/$APP:$DRONE_COMMIT_SHA $APP/target/docker/stage
       - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
@@ -119,12 +99,6 @@ pipeline:
         target: docker_user
       - source: docker_password
         target: docker_password
-      - source: aws_access_key_id
-        target: aws_access_key_id
-      - source: aws_secret_access_key
-        target: aws_secret_access_key
-      - source: aws_region
-        target: aws_region
     commands:
       - docker build -t local/$APP:$RELEASE $APP/target/docker/stage
       - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
