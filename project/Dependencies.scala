@@ -16,9 +16,6 @@ object Dependencies {
   lazy val loggingImplLogback           = "ch.qos.logback"                %     "logback-classic"                    % "1.2.3"
 
   lazy val akkaActor                    = "com.typesafe.akka"             %%    "akka-actor"                         % akkaVersion
-  lazy val akkaCluster                  = "com.typesafe.akka"             %%    "akka-cluster"                       % akkaVersion
-  lazy val akkaClusterTools             = "com.typesafe.akka"             %%    "akka-cluster-tools"                 % akkaVersion
-  lazy val akkaClusterCustomDowning     = "com.github.TanUkkii007"        %%    "akka-cluster-custom-downing"        % "0.0.9"
   lazy val akkaPersistence              = "com.typesafe.akka"             %%    "akka-persistence"                   % akkaVersion
   lazy val akkaPersistenceInMemory      = "com.github.dnvriend"           %%    "akka-persistence-inmemory"          % "2.5.1.1"               % "test"
   lazy val akkaPersistenceDynamoDB      = "com.typesafe.akka"             %%    "akka-persistence-dynamodb"          % "1.1.0"
@@ -29,7 +26,5 @@ object Dependencies {
 
   lazy val asciiGraphs                  = "com.github.mdr"                %%    "ascii-graphs"                       % "0.0.7"
   lazy val scalatest                    = "org.scalatest"                 %%    "scalatest"                          % "3.0.5"                 % "test"
-  lazy val k8sJavaClient                = "io.kubernetes"                 %     "client-java"                        % "3.0.0"
-  lazy val fabric8JavaClient            = "io.fabric8"                    %     "kubernetes-client"                  % "4.1.0" exclude("io.sundr", "sundr-codegen")
 
 }
