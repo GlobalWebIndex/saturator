@@ -1,6 +1,6 @@
 ## saturator
 
-[![Build Status](https://travis-ci.org/GlobalWebIndex/saturator.svg?branch=master)](https://travis-ci.org/GlobalWebIndex/saturator)
+[![DroneCI](https://drone.globalwebindex.net/api/badges/GlobalWebIndex/saturator/status.svg)](https://drone.globalwebindex.net/GlobalWebIndex/saturator)
 
 Finite State Machine that is satisfying dependencies within partitioned/layered directed acyclic graph until it is fully saturated
 

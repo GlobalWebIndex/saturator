@@ -1,34 +1,36 @@
+import Dependencies._
+import Deploy._
 
-version in ThisBuild := "0.5.3"
+lazy val s3Resolver = "S3 Snapshots" at "s3://public.maven.globalwebindex.net.s3-eu-west-1.amazonaws.com/snapshots"
+
 crossScalaVersions in ThisBuild := Seq("2.12.6", "2.11.8")
 organization in ThisBuild := "net.globalwebindex"
 fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi
+resolvers in ThisBuild ++= Seq(
+  "Maven Central Google Mirror EU" at "https://maven-central-eu.storage-download.googleapis.com/repos/central/data/",
+  Resolver.bintrayRepo("tanukkii007", "maven"),
+  s3Resolver
+)
+version in ThisBuild ~= (_.replace('+', '-'))
+dynver in ThisBuild ~= (_.replace('+', '-'))
+cancelable in ThisBuild := true
 
-lazy val tempKryoDep = "net.globalwebindex" %% "akka-kryo-serialization" % "0.5.3-SNAPSHOT" // adhoc published before PR is merged https://github.com/romix/akka-kryo-serialization/pull/124
-
-lazy val saturator = (project in file("."))
-  .settings(aggregate in update := false)
-  .settings(publish := { })
-  .aggregate(`Saturator-api`, `Saturator-core`, `Saturator-example`)
-
-lazy val `Saturator-api` = (project in file("api"))
-  .enablePlugins(CommonPlugin)
+lazy val api = (project in file("api"))
   .settings(libraryDependencies ++= clist)
   .settings(publishSettings("GlobalWebIndex", "saturator-api", s3Resolver))
 
-lazy val `Saturator-core` = (project in file("core"))
-  .enablePlugins(CommonPlugin)
+lazy val core = (project in file("core"))
   .settings(publishSettings("GlobalWebIndex", "saturator-core", s3Resolver))
   .settings(libraryDependencies ++= Seq(
-      asciiGraphs, akkaActor, akkaPersistence, tempKryoDep, akkaSlf4j,
-      akkaTestkit, scalatest, akkaPersistenceInMemory % "test", loggingImplLogback % "test",
+      asciiGraphs, akkaActor, akkaPersistence, akkaKryoSerialization, akkaSlf4j,
+      akkaTestkit, scalatest, akkaPersistenceInMemory, loggingImplLogback % "test",
     )
-  ).dependsOn(`Saturator-api` % "compile->compile;test->test")
+  ).dependsOn(api % "compile->compile;test->test")
 
-lazy val `Saturator-example` = (project in file("example"))
-  .enablePlugins(CommonPlugin, DockerPlugin)
+lazy val example = (project in file("example"))
+  .enablePlugins(DockerPlugin, SmallerDockerPlugin, JavaAppPackaging)
   .settings(publish := { })
   .settings(libraryDependencies ++= clist ++ Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLogback))
-  .settings(deploy(DeployDef(config("app") extend Compile, "anapsix/alpine-java:8u144b01_jdk_unlimited", "gwiq", "saturator-example", "gwi.s8.Launcher")))
-  .dependsOn(`Saturator-core` % "compile->compile;test->test")
+  .settings(Deploy.settings("gwiq", "saturator-example", "gwi.s8.Launcher"))
+  .dependsOn(core % "compile->compile;test->test")
