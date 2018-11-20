@@ -29,7 +29,7 @@ pipeline:
       - source: aws_region
         target: aws_region
     when:
-      event: push
+      event: [deployment, tag, push]
 
   publish-maven-artifacts-and-stage-docker-image:
     image: gwiq/sbt-docker:latest

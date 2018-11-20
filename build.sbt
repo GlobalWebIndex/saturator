@@ -14,15 +14,15 @@ resolvers in ThisBuild ++= Seq(
 version in ThisBuild ~= (_.replace('+', '-'))
 dynver in ThisBuild ~= (_.replace('+', '-'))
 cancelable in ThisBuild := true
+publishArtifact in ThisBuild := false
+stage in (ThisBuild, Docker) := null
 
 lazy val `saturator-api` = (project in file("api"))
   .settings(libraryDependencies ++= clist)
-  .settings(stage in Docker := null)
   .settings(publishSettings("GlobalWebIndex", "saturator-api", s3Resolver))
 
 lazy val `saturator-core` = (project in file("core"))
   .settings(publishSettings("GlobalWebIndex", "saturator-core", s3Resolver))
-  .settings(stage in Docker := null)
   .settings(libraryDependencies ++= Seq(
       asciiGraphs, akkaActor, akkaPersistence, akkaKryoSerialization, akkaSlf4j,
       akkaTestkit, scalatest, akkaPersistenceInMemory, loggingImplLogback % "test",
@@ -31,7 +31,6 @@ lazy val `saturator-core` = (project in file("core"))
 
 lazy val `saturator-example` = (project in file("example"))
   .enablePlugins(DockerPlugin, SmallerDockerPlugin, JavaAppPackaging)
-  .settings(publishSettings("GlobalWebIndex", "saturator-example", s3Resolver))
   .settings(libraryDependencies ++= clist ++ Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLogback))
   .settings(Deploy.settings("gwiq", "saturator-example", "gwi.s8.Launcher"))
   .dependsOn(`saturator-core` % "compile->compile;test->test")
