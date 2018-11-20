@@ -31,7 +31,7 @@ lazy val `saturator-core` = (project in file("core"))
 
 lazy val `saturator-example` = (project in file("example"))
   .enablePlugins(DockerPlugin, SmallerDockerPlugin, JavaAppPackaging)
-  .settings(skip in publish := true)
+  .settings(publishSettings("GlobalWebIndex", "saturator-example", s3Resolver))
   .settings(libraryDependencies ++= clist ++ Seq(akkaPersistenceDynamoDB, akkaPersistenceRedis, loggingImplLogback))
   .settings(Deploy.settings("gwiq", "saturator-example", "gwi.s8.Launcher"))
   .dependsOn(`saturator-core` % "compile->compile;test->test")
