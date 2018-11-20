@@ -30,13 +30,11 @@ pipeline:
         target: aws_region
     when:
       event: push
-      matrix:
-        APP: core
 
-  publish-maven-artifacts:
+  publish-maven-artifacts-and-stage-docker-image:
     image: gwiq/sbt-docker:1.2.4
     commands:
-      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 ${APP}/publish
+      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 publish docker:stage
     secrets:
       - source: aws_access_key_id
         target: aws_access_key_id
@@ -46,26 +44,6 @@ pipeline:
         target: aws_region
     when:
       event: [deployment, tag]
-      matrix:
-        APP:
-          - api
-          - core
-
-  stage-docker-image:
-    image: gwiq/sbt-docker:1.2.4
-    commands:
-      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 ${APP}/docker:stage
-    secrets:
-      - source: aws_access_key_id
-        target: aws_access_key_id
-      - source: aws_secret_access_key
-        target: aws_secret_access_key
-      - source: aws_region
-        target: aws_region
-    when:
-      event: [deployment, tag]
-      matrix:
-        APP: example
 
   rebuild-cache:
     image: drillster/drone-volume-cache
@@ -84,7 +62,7 @@ pipeline:
       - /var/run/docker.sock:/var/run/docker.sock
       - /root/.docker:/root/.docker
     environment:
-      - IMAGE_NAME=gwiq/saturator-${APP}
+      - IMAGE_NAME=gwiq/saturator-example
     secrets:
       - source: docker_user
         target: docker_user
@@ -97,14 +75,12 @@ pipeline:
       - source: aws_region
         target: aws_region
     commands:
-      - docker build -t local/$APP:$DRONE_COMMIT_SHA $APP/target/docker/stage
+      - docker build -t local/saturator-example:$DRONE_COMMIT_SHA example/target/docker/stage
       - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-      - docker tag local/$APP:$DRONE_COMMIT_SHA $IMAGE_NAME:$DRONE_COMMIT_SHA
+      - docker tag local/saturator-example:$DRONE_COMMIT_SHA $IMAGE_NAME:$DRONE_COMMIT_SHA
       - docker push $IMAGE_NAME:$DRONE_COMMIT_SHA
     when:
       event: deployment
-      matrix:
-        APP: example
 
   build-on-tag:
     image: docker:stable
@@ -112,7 +88,7 @@ pipeline:
       - /var/run/docker.sock:/var/run/docker.sock
       - /root/.docker:/root/.docker
     environment:
-      - IMAGE_NAME=gwiq/saturator-${APP}
+      - IMAGE_NAME=gwiq/saturator-example
       - RELEASE=${DRONE_TAG##v}
     secrets:
       - source: docker_user
@@ -126,18 +102,10 @@ pipeline:
       - source: aws_region
         target: aws_region
     commands:
-      - docker build -t local/$APP:$RELEASE $APP/target/docker/stage
+      - docker build -t local/saturator-example:$RELEASE example/target/docker/stage
       - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-      - docker tag local/$APP:$RELEASE $IMAGE_NAME:$RELEASE
+      - docker tag local/saturator-example:$RELEASE $IMAGE_NAME:$RELEASE
       - docker push $IMAGE_NAME:$RELEASE
     when:
       branch: master
       event: tag
-      matrix:
-        APP: example
-
-matrix:
-  APP:
-  - api
-  - core
-  - example
