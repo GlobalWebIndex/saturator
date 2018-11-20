@@ -18,7 +18,7 @@ pipeline:
       event: [push, deployment, tag]
 
   run-tests:
-    image: gwiq/sbt-docker:1.2.4
+    image: gwiq/sbt-docker:latest
     commands:
       - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 -Dsbt.gigahorse=false test
     secrets:
@@ -32,7 +32,7 @@ pipeline:
       event: push
 
   publish-maven-artifacts-and-stage-docker-image:
-    image: gwiq/sbt-docker:1.2.4
+    image: gwiq/sbt-docker:latest
     commands:
       - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 publish docker:stage
     secrets:
