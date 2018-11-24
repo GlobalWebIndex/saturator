@@ -31,7 +31,7 @@ pipeline:
     when:
       event: [deployment, tag, push]
 
-  publish-maven-artifacts-and-stage-docker-image:
+  publish-artifacts-and-stage-image:
     image: gwiq/sbt-docker:latest
     commands:
       - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 publish docker:stage
