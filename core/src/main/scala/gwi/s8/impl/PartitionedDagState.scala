@@ -37,7 +37,7 @@ private[impl] object PartitionedDagState extends StrictLogging {
             logger.error(s"Operation '$opName' on partition $p failed due to : $error \n${ps.printable}")
             underlying // TODO could we do something else than ignore it?
           case Right(newPs) =>
-            logger.info(s"Operation '$opName' on partition $p succeeded\n${ps.printable}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newPs.printable}")
+            logger.debug(s"Operation '$opName' on partition $p succeeded\n${ps.printable}\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n${newPs.printable}")
             underlying updated(p, newPs)
         }
     }
@@ -46,14 +46,14 @@ private[impl] object PartitionedDagState extends StrictLogging {
       val (existingPartitions, nonExistingPartitions) = partitions.partition(underlying.contains)
       val partitionState = PartitionState()
       existingPartitions.foreach( p => logger.warn(s"Idempotently not inserting partition that already exist : $p") )
-      nonExistingPartitions.foreach( p => logger.info(s"Partition created : $p"))
+      nonExistingPartitions.foreach( p => logger.debug(s"Partition created : $p"))
       underlying ++ nonExistingPartitions.map(_ -> partitionState)
     }
 
     private[impl] def updatePartitions(partitions: TreeSet[DagPartition]): PartitionedDagState = {
       val (existingPartitions, nonExistingPartitions) = partitions.partition(underlying.contains) // updated partition should not be progressing
       nonExistingPartitions.foreach( p => logger.error(s"Partition cannot be changed because it is missing : $p") )
-      existingPartitions.foreach( p => logger.info(s"Partition changed : $p") )
+      existingPartitions.foreach( p => logger.debug(s"Partition changed : $p") )
       val newPartitionsDagState =
         existingPartitions.flatMap { p =>
           underlying(p).redo(dag.root) match {

@@ -94,7 +94,7 @@ class DagFSM(
       stop() replying out.Submitted(in.ShutDown, stateData.partitionedDagState, stateData.depsInFlight)
 
     case Event(system.Submit(cmd), _) =>
-      log.info(s"Issuing cmd $cmd")
+      log.debug(s"Issuing cmd $cmd")
       stay() replying out.Issued(cmd, stateData.partitionedDagState, stateData.depsInFlight)
   }
 
