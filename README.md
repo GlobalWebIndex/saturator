@@ -1,6 +1,8 @@
 ## saturator
 
 [![DroneCI](https://drone.globalwebindex.net/api/badges/GlobalWebIndex/saturator/status.svg)](https://drone.globalwebindex.net/GlobalWebIndex/saturator)
+[![saturator-api](https://api.bintray.com/packages/l15k4/GlobalWebIndex/saturator-api/images/download.svg) ](https://bintray.com/l15k4/GlobalWebIndex/saturator-api/_latestVersion)
+[![saturator-core](https://api.bintray.com/packages/l15k4/GlobalWebIndex/saturator-core/images/download.svg) ](https://bintray.com/l15k4/GlobalWebIndex/saturator-core/_latestVersion)
 
 Finite State Machine that is satisfying dependencies within partitioned/layered directed acyclic graph until it is fully saturated
 
