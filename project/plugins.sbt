@@ -7,6 +7,7 @@ resolvers ++= Seq(
 
 addSbtPlugin("com.typesafe.sbt"     % "sbt-native-packager"   % "1.3.10")
 addSbtPlugin("io.get-coursier"      % "sbt-coursier"          % "1.0.2")
-addSbtPlugin("net.globalwebindex"   % "sbt-smaller-docker"    % "0.0.3")
+addSbtPlugin("net.globalwebindex"   % "sbt-smaller-docker"    % "0.0.4")
 addSbtPlugin("com.dwijnand"         % "sbt-dynver"            % "3.0.0")
+addSbtPlugin("org.foundweekends"    % "sbt-bintray"           % "0.5.4")
 addSbtPlugin("com.frugalmechanic"   % "fm-sbt-s3-resolver"    % "0.16.0")

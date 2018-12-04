@@ -1,3 +1,4 @@
+import bintray.BintrayKeys._
 import sbt.Keys._
 import sbt._
 import net.globalwebindex.sbt.docker.SmallerDockerPlugin.autoImport._
@@ -14,7 +15,7 @@ object Deploy {
     else true
   }
 
-  def settings(repository: String, appName: String, mainClassFqn: String): Seq[Def.Setting[_]] = {
+  def dockerSettings(repository: String, appName: String, mainClassFqn: String): Seq[Def.Setting[_]] = {
     Seq(
       dockerUpdateLatest := false,
       dockerRepository := Some(repository),
@@ -27,14 +28,20 @@ object Deploy {
   }
 
 
-  def publishSettings(organization: String, projectName: String, resolverOpt: sbt.Resolver) = Seq(
-    publishTo := Some(resolverOpt),
-    publishMavenStyle := true,
+  def bintraySettings(ghProjectName: String) = Seq(
     publishArtifact := true,
+    publishMavenStyle := true,
     publishArtifact in Test := false,
+    organization := "net.globalwebindex",
+    homepage := Some(url(s"https://github.com/GlobalWebIndex/$ghProjectName/blob/master/README.md")),
+    licenses in ThisBuild += ("MIT", url("http://opensource.org/licenses/MIT")),
+    developers += Developer("l15k4", "Jakub Liska", "liska.jakub@gmail.com", url("https://github.com/l15k4")),
+    scmInfo := Some(ScmInfo(url(s"https://github.com/GlobalWebIndex/$ghProjectName"), s"git@github.com:GlobalWebIndex/$ghProjectName.git")),
+    bintrayVcsUrl := Some(s"git@github.com:GlobalWebIndex/$ghProjectName.git"),
+    bintrayRepository := "GlobalWebIndex",
     pomIncludeRepository := { _ => false },
     pomExtra :=
-      <url>https://github.com/{organization}/{projectName}</url>
+      <url>https://github.com/{organization}/{ghProjectName}</url>
         <licenses>
           <license>
             <name>The MIT License (MIT)</name>
@@ -43,8 +50,8 @@ object Deploy {
           </license>
         </licenses>
         <scm>
-          <url>git@github.com:{organization}/{projectName}.git</url>
-          <connection>scm:git:git@github.com:{organization}/{projectName}.git</connection>
+          <url>git@github.com:{organization}/{ghProjectName}.git</url>
+          <connection>scm:git:git@github.com:{organization}/{ghProjectName}.git</connection>
         </scm>
         <developers>
           <developer>
@@ -54,5 +61,4 @@ object Deploy {
           </developer>
         </developers>
   )
-
 }

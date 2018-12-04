@@ -34,8 +34,12 @@ pipeline:
   publish-artifacts-and-stage-image:
     image: gwiq/sbt-docker:latest
     commands:
-      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 publish docker:stage
+      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 saturator-api/publish saturator-core/publish saturator-example/docker:stage
     secrets:
+      - source: bintray_user
+        target: bintray_user
+      - source: bintray_pass
+        target: bintray_pass
       - source: aws_access_key_id
         target: aws_access_key_id
       - source: aws_secret_access_key
