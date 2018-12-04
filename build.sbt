@@ -17,10 +17,10 @@ stage in (ThisBuild, Docker) := null
 
 lazy val `saturator-api` = (project in file("api"))
   .settings(libraryDependencies ++= clist)
-  .settings(bintraySettings("saturator"))
+  .settings(bintraySettings("GlobalWebIndex", "saturator"))
 
 lazy val `saturator-core` = (project in file("core"))
-  .settings(bintraySettings("saturator"))
+  .settings(bintraySettings("GlobalWebIndex", "saturator"))
   .settings(libraryDependencies ++= Seq(
       asciiGraphs, akkaActor, akkaPersistence, akkaKryoSerialization, akkaSlf4j,
       akkaTestkit, scalatest, akkaPersistenceInMemory, loggingImplLogback % "test"
