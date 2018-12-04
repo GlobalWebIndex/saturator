@@ -2,7 +2,7 @@ import sbt._
 
 object Dependencies {
 
-  val akkaVersion                       = "2.5.16"
+  val akkaVersion                       = "2.5.18"
 
   lazy val clist                        = Seq(
     "org.backuity.clist"            %%    "clist-core"                                % "3.5.0",

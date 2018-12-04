@@ -7,7 +7,7 @@ fork in Test in ThisBuild := true
 libraryDependencies in ThisBuild ++= loggingApi
 resolvers in ThisBuild ++= Seq(
   "Maven Central Google Mirror EU" at "https://maven-central-eu.storage-download.googleapis.com/repos/central/data/",
-  "S3 Snapshots" at "s3://public.maven.globalwebindex.net.s3-eu-west-1.amazonaws.com/snapshots"
+  Resolver.bintrayRepo("l15k4", "GlobalWebIndex")
 )
 version in ThisBuild ~= (_.replace('+', '-'))
 dynver in ThisBuild ~= (_.replace('+', '-'))
