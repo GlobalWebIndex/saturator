@@ -24,7 +24,7 @@ object Dependencies {
   lazy val akkaSlf4j                    = "com.typesafe.akka"             %%    "akka-slf4j"                         % akkaVersion
   lazy val akkaTestkit                  = "com.typesafe.akka"             %%    "akka-testkit"                       % akkaVersion             % "test"
 
-  lazy val asciiGraphs                  = "com.github.mdr"                %%    "ascii-graphs"                       % "0.0.7"
+  lazy val asciiGraphs                  = "net.globalwebindex"            %%    "ascii-graphs"                       % "0.0.7"
   lazy val scalatest                    = "org.scalatest"                 %%    "scalatest"                          % "3.0.5"                 % "test"
 
 }
