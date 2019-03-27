@@ -6,43 +6,24 @@ clone:
 
 pipeline:
 
-  restore-cache:
-    image: drillster/drone-volume-cache
-    restore: true
-    mount:
-      - ./.ivy2
-      - ./.coursier
-    volumes:
-      - /tmp/cache:/cache
-    when:
-      event: [push, deployment, tag]
-
   run-tests:
     image: gwiq/sbt-docker:latest
+    volumes:
+      - /var/lib/docker/sbt:/cache
     commands:
-      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 -Dsbt.gigahorse=false test
+      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=/cache/.coursier -Dsbt.ivy.home=/cache/.ivy2 -Divy.home=/cache/.ivy2 -Dfile.encoding=utf-8 -Dsbt.gigahorse=false test
     when:
       event: [deployment, tag, push]
 
   publish-artifacts-and-stage-image:
     image: gwiq/sbt-docker:latest
+    volumes:
+      - /var/lib/docker/sbt:/cache
     commands:
-      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=./.coursier -Dsbt.ivy.home=./.ivy2 -Dfile.encoding=utf-8 saturator-api/publish saturator-core/publish saturator-example/docker:stage
+      - sbt -mem 1024 -Djline.terminal=off -Dcoursier.cache=/cache/.coursier -Dsbt.ivy.home=/cache/.ivy2 -Divy.home=/cache/.ivy2 -Dfile.encoding=utf-8 saturator-api/publish saturator-core/publish saturator-example/docker:stage
     secrets: [ bintray_user, bintray_pass ]
     when:
       event: [deployment, tag]
-
-  rebuild-cache:
-    image: drillster/drone-volume-cache
-    rebuild: true
-    mount:
-      - ./.ivy2
-      - ./.coursier
-    volumes:
-      - /tmp/cache:/cache
-    when:
-      event: [push, deployment, tag]
-      status: [ failure, success ]
 
   build-on-deploy:
     image: docker:stable
